@@ -1,8 +1,9 @@
-FROM ubuntu:18.04
+FROM cdci-base
 
-RUN apt-get update && apt-get install -y \
-        iputils-ping net-tools iproute2 bash openssl wget unzip bsdmainutils ssh vim \
-	netcat dns2tcp httptunnel ptunnel udptunnel 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        openssl wget unzip bsdmainutils openssh-server vim-tiny \
+        netcat-openbsd dns2tcp httptunnel ptunnel udptunnel \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY start_app.sh .
-CMD ./start_app.sh
+CMD ["./start_app.sh"]

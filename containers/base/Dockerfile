@@ -1,8 +1,8 @@
-FROM ubuntu:18.04
+FROM cdci-base
 
-RUN apt-get update && apt-get install -y iputils-ping net-tools iproute2 bash \
-	dnsutils openssl tcpdump
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        dnsutils openssl tcpdump \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY start_app.sh .
-CMD ./start_app.sh 
-
+CMD ["./start_app.sh"]
