@@ -10,8 +10,8 @@
 # ============================================================
 FROM ubuntu:26.04 AS snort-builder
 ENV DEBIAN_FRONTEND=noninteractive
-ARG LIBDAQ_VERSION=v3.0.18
-ARG SNORT_VERSION=3.3.0.0
+ARG LIBDAQ_VERSION=v3.0.28
+ARG SNORT_VERSION=3.12.4.0
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential cmake pkg-config git wget ca-certificates \
@@ -24,14 +24,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /usr/src
 
 # Build LibDAQ
-RUN git clone https://github.com/snort3/libdaq.git && \
-    cd libdaq && git checkout ${LIBDAQ_VERSION} && \
+RUN git clone --depth 1 --branch ${LIBDAQ_VERSION} https://github.com/snort3/libdaq.git && \
+    cd libdaq && \
     ./bootstrap && ./configure --prefix=/usr/local && \
     make -j$(nproc) && make install
 
 # Build Snort 3
-RUN git clone https://github.com/snort3/snort3.git && \
-    cd snort3 && git checkout ${SNORT_VERSION} && \
+RUN git clone --depth 1 --branch ${SNORT_VERSION} https://github.com/snort3/snort3.git && \
+    cd snort3 && \
+    # Fix cmake_minimum_required for Ubuntu 26.04 CMake if needed
+    find . -name CMakeLists.txt -exec sed -i 's/cmake_minimum_required(VERSION 2\./cmake_minimum_required(VERSION 3.5) #was 2./' {} + 2>/dev/null || true && \
+    find . -name CMakeLists.txt -exec sed -i 's/cmake_minimum_required(VERSION 3\.0)/cmake_minimum_required(VERSION 3.5)/' {} + 2>/dev/null || true && \
     ./configure_cmake.sh --prefix=/usr/local && \
     cd build && make -j$(nproc) && make install && ldconfig
 
