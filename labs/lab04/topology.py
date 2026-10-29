@@ -20,21 +20,21 @@ def myNetwork():
     s1 = net.addSwitch('s1', cls=OVSSwitch)
 
     info( '*** Add hosts\n')
-    # attacker 2 docker containers
+    # CDCI docker containers
     mn_args = {
         "network_mode": "none",
         "dimage": "cdci_base",
         "dcmd": None,
         "ip": "192.168.16.2/24",
     }
-    H1 = net.addDocker('attacker', **mn_args)
+    H1 = net.addDocker('cdci_atk', **mn_args)
     mn_args = {
         "network_mode": "none",
         "dimage": "cdci_base",
         "dcmd": "/usr/local/bin/start_app.sh",
         "ip": "192.168.16.100/24",
     }
-    H2 = net.addDocker('victim', **mn_args)
+    H2 = net.addDocker('cdci_victim', **mn_args)
 
     info( '*** Add links\n')
     net.addLink( H1, s1 )

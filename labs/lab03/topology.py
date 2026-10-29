@@ -11,23 +11,23 @@ from mininet.util import ipAdd, netParse, ipStr, info, waitListening
 
 SWITCHES = ["sw0", "sw1", "sw2", "sw3", "sw4"]
 HOSTS = {
-    "srv1": {"multi": True, "type": None, "ip": "10.88.205.3/24", "link":
+    "cdci_srv1": {"multi": True, "type": None, "ip": "10.88.205.3/24", "link":
              "sw1", "dimage": "rpi-mn/base"},
-    "srv2": {"multi": True, "type": None, "ip": "10.7.6.3/24", "link":
+    "cdci_srv2": {"multi": True, "type": None, "ip": "10.7.6.3/24", "link":
                  "sw2", "dimage": "rpi-mn/base"},
-    "srv3": {"multi": True, "type": None, "ip": "10.5.140.3/24", "link":
+    "cdci_srv3": {"multi": True, "type": None, "ip": "10.5.140.3/24", "link":
                  "sw3", "dimage": "rpi-mn/base"},
-    "srv4": {"multi": True, "type": None, "ip": "10.155.20.3/24", "link":
+    "cdci_srv4": {"multi": True, "type": None, "ip": "10.155.20.3/24", "link":
                  "sw4", "dimage": "rpi-mn/base"},
-    "d1": {"type": Docker, "ip": "10.88.205.2/24", "link": "sw1",
+    "cdci_dns": {"type": Docker, "ip": "10.88.205.2/24", "link": "sw1",
         "dimage": "cdci_base", "dcmd": "/opt/start_scripts/lab03_dns/start_lab03_dns.sh"},
-    "d2": {"type": Docker, "ip": "10.7.6.2/24", "link": "sw2",
+    "cdci_iot": {"type": Docker, "ip": "10.7.6.2/24", "link": "sw2",
         "dimage": "cdci_base", "dcmd": "/opt/start_scripts/lab05_iot/start.sh"},
-    "d3": {"type": Docker, "ip": "10.155.20.2/24", "link": "sw4",
+    "cdci_dvwa": {"type": Docker, "ip": "10.155.20.2/24", "link": "sw4",
         "dimage": "dvwa", "dcmd": "apache2-foreground"},
-    "attacker": {"type": Docker, "ip": "172.16.0.1/24", "link": "sw0",
+    "cdci_atk": {"type": Docker, "ip": "172.16.0.1/24", "link": "sw0",
                   "dimage": "cdci_base"},
-    "dhcpserver": {"type": Docker, "ip": "10.255.255.249/24", "link": "sw0",
+    "cdci_dhcp": {"type": Docker, "ip": "10.255.255.249/24", "link": "sw0",
                   "dimage": "cdci_base", "dcmd": "/opt/start_scripts/lab03_dhcpd/start_lab03_dhcpd.sh"},
     }
 ROUTERS = {
@@ -61,16 +61,17 @@ ROUTES = {
            ("10.7.6.0/24", "10.255.255.2"),     # sw2 via r2
            ("10.5.140.0/24", "10.20.25.1"),     # sw3 via r3
            ("default", "10.255.255.249")],      # nat
-    "d1": [("default", "10.88.205.1")],  # use default gw here
-    "d2": [("default", "10.7.6.1")],  # use default gw here
-    "d3": [("default", "10.155.20.1")],  # use default gw here
-    "dhcpserver": [("10.7.6.0/24", "10.255.255.2"),
+    "cdci_dns": [("default", "10.88.205.1")],  # DNS server
+    "cdci_iot": [("default", "10.7.6.1")],  # IoT server
+    "cdci_dvwa": [("default", "10.155.20.1")],  # DVWA
+    "cdci_dhcp": [("10.7.6.0/24", "10.255.255.2"),
         ("10.88.205.0/24", "10.255.255.1"),
         ("10.155.20.0/24", "10.255.255.4"),
-        ("10.5.140.0/24", "10.255.255.4")],  # use default gw here
+        ("10.5.140.0/24", "10.255.255.4")],  # DHCP server
     }
 NETWORKS = {
-    "lab03": ["dhcpserver","d1", "d2", "d3", "attacker", "srv1", "srv2","srv3", "srv4"],
+    "lab03": ["cdci_dhcp", "cdci_dns", "cdci_iot", "cdci_dvwa", "cdci_atk",
+              "cdci_srv1", "cdci_srv2", "cdci_srv3", "cdci_srv4"],
 }
 
 class LinuxRouter(Node):

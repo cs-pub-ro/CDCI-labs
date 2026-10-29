@@ -20,28 +20,28 @@ def myNetwork():
     s1 = net.addSwitch('s1')
 
     info( '*** Add hosts\n')
-    # attacker 2 docker containers
+    # CDCI docker containers
     mn_args = {
         "network_mode": "none",
         "dimage": "cdci_base",
         "dcmd": "/usr/local/bin/start_app.sh",
         "ip": "192.168.16.2/24",
     }
-    H1 = net.addDocker('h1', **mn_args)
+    H1 = net.addDocker('cdci_h1', **mn_args)
     mn_args = {
         "network_mode": "none",
         "dimage": "cdci_base",
         "dcmd": "/usr/local/bin/start_app.sh",
         "ip": "192.168.16.3/24",
     }
-    H2 = net.addDocker('h2', **mn_args)
+    H2 = net.addDocker('cdci_h2', **mn_args)
     mn_args = {
         "network_mode": "none",
         "dimage": "cdci_base",
         "dcmd": None,
         "ip": "192.168.16.100/24",
     }
-    H3 = net.addDocker('IDS', **mn_args)
+    H3 = net.addDocker('cdci_ids', **mn_args)
 
     info( '*** Add links\n')
     net.addLink( H1, s1 )
@@ -61,7 +61,7 @@ def myNetwork():
     H1.cmd('ip r a default via 192.168.16.1')
     H2.cmd('ip r a default via 192.168.16.1')
 
-    # port mirroring all from s1 to IDS
+    # port mirroring all from s1 to cdci_ids
     cmd = '''ovs-vsctl del-port s1-eth3'''
     results = subprocess.run(cmd, shell=True, universal_newlines=True, check=True).stdout
     print (results)
