@@ -51,8 +51,9 @@ RUN apt-get update \
       iputils-ping net-tools iproute2 bash dnsutils traceroute \
       # Security / analysis
       openssl tcpdump nmap ettercap-text-only iptables \
+      hping3 arpwatch arp-scan \
       # Connectivity
-      netcat-traditional wget curl unzip ssh lynx \
+      netcat-traditional netcat-openbsd wget curl unzip ssh lynx \
       # Tunneling tools
       dns2tcp httptunnel ptunnel udptunnel \
       # Services (for server roles)
@@ -62,7 +63,7 @@ RUN apt-get update \
       # Snort 3 runtime dependencies
       libpcap0.8 libpcre2-8-0 libunwind8 libhwloc15 \
       libluajit-5.1-2 libssl3t64 zlib1g libtirpc3t64 \
-      libnetfilter-queue1 libmnl0 \
+      libnetfilter-queue1 libmnl0 libdumbnet1 libnuma1 \
       # Utilities
       vim bsdmainutils \
  && rm -rf /var/lib/apt/lists/*
