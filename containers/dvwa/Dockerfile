@@ -18,7 +18,7 @@ RUN mariadb-install-db --user=mysql --datadir=/var/lib/mysql 2>/dev/null; \
     mariadb -e "CREATE USER IF NOT EXISTS 'dvwa'@'127.0.0.1' IDENTIFIED BY 'p@ssw0rd';" && \
     mariadb -e "GRANT ALL PRIVILEGES ON dvwa.* TO 'dvwa'@'127.0.0.1';" && \
     mariadb -e "FLUSH PRIVILEGES;" && \
-    mariadbadmin shutdown && sleep 2
+    kill $(cat /run/mysqld/mysqld.pid 2>/dev/null || pgrep mariadbd) && sleep 2
 
 # Custom entrypoint: starts MariaDB, then runs original DVWA entrypoint
 COPY start_dvwa.sh /usr/local/bin/start_dvwa.sh
