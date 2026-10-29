@@ -1,0 +1,12 @@
+====== Lab09. Introduction to IDS  ======
+
+===== Objectives =====
+
+  * Introduction to snort
+
+===== Topology =====
+
+
+===== Tasks =====
+
+Please solve Lab "26.1.7 Lab - Snort and Firewall Rules" from the Netacad platform.

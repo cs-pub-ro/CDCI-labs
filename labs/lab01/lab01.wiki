@@ -1,0 +1,15 @@
+====== Lab01. Introduction to Linux ======
+
+===== Objectives =====
+
+  * Introduction to command line tools in Linux
+
+
+===== Topology =====
+
+For this exercise you will need a SSH-capable machine (putty, bash, PowerShell). 
+
+===== Tasks =====
+
+Please solve the first 15 tasks from OvertheWire: [[https://overthewire.org/wargames/bandit/ || https://overthewire.org/wargames/bandit/ ]].
+

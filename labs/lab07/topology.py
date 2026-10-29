@@ -23,22 +23,22 @@ def myNetwork():
     # attacker 2 docker containers
     mn_args = {
         "network_mode": "none",
-        "dimage": "exam_docker",
-        "dcmd": "./start_app.sh",
+        "dimage": "cdci_base",
+        "dcmd": "/usr/local/bin/start_app.sh",
         "ip": "192.168.16.2/24",
     }
     H1 = net.addDocker('h1', **mn_args)
     mn_args = {
         "network_mode": "none",
-        "dimage": "exam_docker",
-        "dcmd": "./start_app.sh",
+        "dimage": "cdci_base",
+        "dcmd": "/usr/local/bin/start_app.sh",
         "ip": "192.168.16.3/24",
     }
     H2 = net.addDocker('h2', **mn_args)
     mn_args = {
         "network_mode": "none",
-        "dimage": "lab07/snort",
-        "dcmd": None,
+        "dimage": "cdci_base",
+        "dcmd": "/opt/start_scripts/lab09_snort/start.sh",
         "ip": "192.168.16.100/24",
     }
     H3 = net.addDocker('IDS', **mn_args)

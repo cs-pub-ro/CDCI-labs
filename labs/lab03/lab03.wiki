@@ -1,0 +1,93 @@
+====== Lab03. Malware sample analysis ======
+
+===== Objectives =====
+
+  * Investigate a possible malware using Windows tools
+  * Consider the network traffic of a malware
+  * Analyze the files and registers used by a malware
+  * Modify a malware and see the behavior of an anti-virus solution
+
+
+===== Topology =====
+
+For this exercise you will need a Windows 10 virtual machine. 
+===== Tasks =====
+
+==== 01. [5p] Virtual machine setup ====
+
+<note warning>
+
+**If your VM networking is connected to your computer network, your computer might get infected during this lab activity. Create a snapshot for the VM before you continue.**
+
+</note>
+
+Open the Windows 10 virtual machine and make sure that it is not connected to the local network and it does have Internet access via NAT interface (not bridged). Turn off your Windows defender protection (Windows Settings->Update & Security->Windows Security->Virus & threat protection->Virus & threat protection Settings->Turn off Real-time protection). 
+
+{{ :cdci:labs:cdci_lab01_disable-windows-defender.png?600 |}}
+==== 02. [5p] Lab setup ====
+
+Download the [[https://drive.google.com/open?id=11WTT3NYUfVk7UopVnUc-uf9SKgvzIcOf|lab setup]] files from the assistant. Install the programs and extract the sample files. 
+
+<note>
+The sample archive contain one malware and uses the "malware" password. 
+</note>
+==== 03. [10p] Initial file analysis ====
+
+Your network administrator has provided you with 10 files that look suspicious and where caught by the network security equipment. Your job is to determine if there is any suspicious file and find out as much information about it as possible. Fill in the following data for each file. Try to do this using a (PowerShell) script.
+
+^ Filename ^ Type of file (EXE,DLL,etc.) ^ Original filename ^ Date modified ^ MD5 hash ^
+|  -  |  -  |  -  |  -  |  -  |
+==== 04. [5p] File compare ====
+
+Is the previous information enough? Does it really help? Use the WinMergePortable.exe program and compare “test1.exe” against “test2.exe”. What about their hashes, how close are them? Consider the file properties and spot the differences.
+==== 05. [15p] Behaviour analysis ====
+
+<note>
+Sometimes this malware versions needs a second re-execution just to speed it up. Do not restart your computer.
+</note>
+
+Find out which of the files are executables and start them. Observe their behavior.
+  * Write down the commands that the program is trying to execute (we will investigate those later).
+  * What happened to your test folder (from which the ransomware was started)?
+  * Wait for the computer to get fully infected, consider your “Documents” or “Desktop” folder and see if you can see the decryptor shortcut. Try to create a new text file and wait for it to be encrypted.
+
+<note warning>
+
+**Revert to the previously created snapshot and re-open the VM.**
+
+</note>
+==== 06. [10p] Malware network activity monitoring ====
+
+In this exercise you will monitor the network connections of the malware. Start Wireshark before running the malware and save the captures. You can copy/paste the pcap file outside the VM and analyze it. Please write down the followings:
+  * What are the types of connections created (DNS, TCP, HTTP).
+  * What are the destinations (IP addresses and DNS domains)? Try to verify their reputation against a threat intelligence source such as the one provided by Cisco Talos (https://www.talosintelligence.com).
+  * Can you examine the traffic or is it encrypted? 
+
+==== 07. [5p] Active connections ====
+
+For a proper analysis of the malware traffic you can use the netstat tool to view all active connection. It helps to narrow down the traffic from a specific process. Open it before running the application and see the outgoing connections. You can also use TcpLogView to save the data in a readable format.
+==== 08. [10p] Windows registry activity analysis ====
+
+Besides network access, a malware will try to make itself hard to find and to remove, adding different registry entries. Use the Procmon tool to monitor the entries in the registers done by the malware. 
+  * Use the filtering options to show only registry activity. Save the data for later analysis (outside the virtual machine).
+  * You can also create a custom filter to limit the output to files containing only the “@WanaDecryptor@.exe” process name. Are these entries the only one created by the malware?
+  * Try to filter also based on result, only the one with “SUCCESS”.
+  * Try to find the registry location that allows the malware to run at boot time. (Hint: https://docs.microsoft.com/en-us/windows/desktop/setupapi/run-and-runonce-registry-keys). Remove it using Registry Editor.
+
+==== 09. [10p] File creation monitoring ====
+
+Use the previous data saved (or re-run the procmon tool) and look at the files created and opened by the malware. 
+  * Filter based on the Process name for both ““@WanaDecryptor@.exe” and “testXX.exe” (the malware sample). 
+  * Create a file on desktop, and try to see if this is opened by the malware. 
+  * The malware sample is known to use the tor proxy network, look for the “tor.exe” file on the disk.
+
+==== 10. [5p] Malware morphing ====
+
+Modify the malware using the ResourceHacker tool (e.g., version number) and make sure that that hashes changes. Enable the Windows Defender Virus and Threat Defender. See if it can find the old executable as malware, what about the new one?
+==== 11. [10p] Threat intelligence ====
+
+For more information of the malware please search for the hash on “https://www.virustotal.com”. What about the new hash, did the virustotal website find it? You can also upload the new file and see the results. Try to see if you can also spot other types of behavior that the malware does in the security report provided.
+==== 12. [10p] Threat hunting ====
+
+The selected malware uses bitcoin as a payment alternative. Investigate how much money did they earned. 
+

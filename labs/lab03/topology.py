@@ -20,15 +20,15 @@ HOSTS = {
     "srv4": {"multi": True, "type": None, "ip": "10.155.20.3/24", "link":
                  "sw4", "dimage": "rpi-mn/base"},
     "d1": {"type": Docker, "ip": "10.88.205.2/24", "link": "sw1",
-        "dimage": "lab03/dnsserver", "dcmd": "./start_app.sh "},
+        "dimage": "cdci_base", "dcmd": "/opt/start_scripts/lab03_dns/start_lab03_dns.sh"},
     "d2": {"type": Docker, "ip": "10.7.6.2/24", "link": "sw2",
-        "dimage": "lab03/iot", "dcmd":"./start_app.sh "},
+        "dimage": "cdci_base", "dcmd": "/opt/start_scripts/lab05_iot/start.sh"},
     "d3": {"type": Docker, "ip": "10.155.20.2/24", "link": "sw4",
         "dimage": "dvwa", "dcmd": "./start_app.sh"},
     "attacker": {"type": Docker, "ip": "172.16.0.1/24", "link": "sw0",
-                  "dimage": "kali"},
+                  "dimage": "cdci_base"},
     "dhcpserver": {"type": Docker, "ip": "10.255.255.249/24", "link": "sw0",
-                  "dimage": "lab03/dhcpserver", "dcmd": "./start_app.sh"},
+                  "dimage": "cdci_base", "dcmd": "/opt/start_scripts/lab03_dhcpd/start_lab03_dhcpd.sh"},
     }
 ROUTERS = {
     "r1": {"links": [("sw0", "eth1", "10.255.255.1/24"),

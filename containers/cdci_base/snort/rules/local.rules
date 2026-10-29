@@ -1,0 +1,38 @@
+# ---------------------------------------------------------------------------
+# CDCI Lab - Local Snort 3 Rules
+# Migrated from Snort 2.x local.rules
+# (c) Mihai Chiroiu - CDCI
+# ---------------------------------------------------------------------------
+#
+# These rules are designed for the CDCI IDS lab (Lab 09).
+# Students can add their own rules below the existing ones.
+#
+# Snort 3 rule format is the same as Snort 2 for basic rules.
+# Key differences:
+#   - 'rev' is now required (added rev:1 where missing)
+#   - SID ranges: 1000000+ for local rules
+# ---------------------------------------------------------------------------
+
+# ICMP monitoring - Alert on pings to Google DNS
+alert icmp any any -> 8.8.8.8 any (msg:"CDCI - Pinging Google DNS 8.8.8.8"; sid:1000004; rev:1;)
+
+# IRC C&C detection rules (botnet command-and-control)
+# alert tcp any any -> any 6667 (msg:"IRC protocol traffic"; sid:1000005; rev:1;)
+
+alert tcp any 6667 -> any any (msg:"CDCI - C&C Server sent netinfo command"; content:"!netinfo"; sid:1000006; rev:1;)
+alert tcp any 6667 -> any any (msg:"CDCI - C&C Server sent sysinfo command"; content:"!sysinfo"; sid:1000007; rev:1;)
+alert tcp any 6667 -> any any (msg:"CDCI - C&C Server sent port scan command"; content:"!scan"; sid:1000008; rev:1;)
+alert tcp any 6667 -> any any (msg:"CDCI - C&C Server sent download command"; content:"!download"; sid:1000009; rev:1;)
+
+# ---------------------------------------------------------------------------
+# Additional lab rules for students
+# ---------------------------------------------------------------------------
+
+# Example: detect HTTP traffic
+# alert tcp any any -> any $HTTP_PORTS (msg:"CDCI - HTTP traffic detected"; flow:to_server,established; sid:1000010; rev:1;)
+
+# Example: detect SSH brute force (threshold in snort.lua event_filter)
+# alert tcp any any -> any 22 (msg:"CDCI - SSH connection attempt"; flow:to_server,established; sid:1000011; rev:1;)
+
+# Example: detect DNS queries
+# alert udp any any -> any 53 (msg:"CDCI - DNS query"; sid:1000012; rev:1;)

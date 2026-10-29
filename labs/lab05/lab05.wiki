@@ -1,0 +1,192 @@
+====== Lab05. Network discovery ======
+
+<note warning>
+Important read to be graded!
+{{page>:cdci:rec&nofooter&noeditbutton&noheader}}
+</note>
+
+===== Objectives =====
+
+  * Network discovery using nmap
+  * Wireshark usage for protocol dissection 
+
+===== Topology =====
+
+For this lab you will have to discover the topology manually. 
+
+https://github.com/CiscoNetAcad/SEED
+
+===== Tasks =====
+
+==== 01. [5p] Virtual machine setup ====
+
+First, make sure that your virtual machine is updated, run the provided update.sh script.
+
+Next, in one terminal start the provided Mininet topology.
+<code>
+root@cdci:/# cd cdci/labs/lab03
+root@cdci:/# /usr/bin/python3 topology.py
+</code>
+
+If there are any problems with starting the topology (if all is good you should see the Mininet prompt ">") use the given cleanup script and try to restart the topology. You will require a second (even third) ssh connection to the OpenStack VM.
+
+==== 02. [10p] Connecting to the network ====
+
+The main goal of the lab is to discover the network infrastructure and protocols available. The attacker is connected directly into sw0 using attacker-eth0. First, login into the attacker's docker using the "attacker_bash.sh" script (from ~/cdci/labs/lab03). 
+
+The network uses DHCP, so you can get an IP address. Investigate the obtained resources via the DHCP protocol (IP address, routes, etc.) and write them down.
+
+<solution>
+<code>
+root@attacker:/# ip a f attacker-eth0
+root@attacker:/# dhclient attacker-eth0
+root@attacker:/# ip r s
+10.0.0.0/8 via 10.255.255.249 dev attacker-eth0
+10.255.255.0/24 dev attacker-eth0 proto kernel scope link src 10.255.255.207
+root@attacker:/# ip a s
+165: attacker-eth0@if164: 
+    inet 10.255.255.207/24 brd 255.255.255.255 scope global dynamic attacker-eth0
+</code>
+</solution>
+==== 03. [10p] DHCP protocol inspection ====
+
+<note important>
+For tcpdump to work inside the Docker container use '-Z root' as an argument. This will force tcpdump to run as a root.
+</note>
+
+Now, that you are connected to the network re-run the DHCP protocol and save it using "tcpdump". First, make sure that you flush the IP addresses on the interface ("ip a f"). You might need to open a second terminal to the attacker's docker. Open the saved capture on your local computer using Wireshark and inspect the DHCP process. Try to answer the following questions. 
+  * How can you filter the traffic to view only the DHCP packets? 
+  * What is the duration of the lease?
+  * Can you identify the DHCP option regarding routing information? What number is it? Which is the network and next hop information?
+
+==== 04. [15p] Basic topology discovery ====
+
+Now that you know what your network is, find out all available hosts within your subnet. For this job you can use the "nmap" tool and perform a very fast ping scan. You got a hint that all the networks use a /24 mask and that the default gateway uses .1 as its IP address. Optimize the nmap scanning time, search in the nmap manual for timing and performance options (in the virtual environment the RTT is typically less than 5ms).
+
+<note tip>
+To scan only for a [[https://nmap.org/book/man-target-specification.html|specific range]] of IP addresses you can use nmap range for target specification, e.g., 192.168.0-255.1.  
+</note> 
+
+<note tip>
+You should discover 5 gateways/networks in the topology. 
+</note> 
+
+<solution>
+<code>
+nmap --min-hostgroup 256 -n -sn -T5 --max-retries 1 --min-parallelism=256 --max-rtt-timeout 5ms --min-rate 1024 10.0-255.0-255.1
+
+Nmap scan report for 10.5.140.1
+Host is up (0.00040s latency).
+Nmap scan report for 10.7.6.1
+Host is up (0.0011s latency).
+Nmap scan report for 10.88.205.1
+Host is up (0.0010s latency).
+Nmap scan report for 10.155.20.1
+Host is up (0.00063s latency).
+Nmap scan report for 10.255.255.1
+</code>
+</solution>
+
+==== 05. [15p] Routes discovery ====
+
+After finding out the IP addresses in use on the topology, let's find the routes to each subnet. Use traceroute to identify the path.
+  * What type of packets does the traceroute tool sent? Can you change it to use ICMP for discovery?
+  * What’s the TTL values in these packets? 
+  * What type of ICMP packet does the host receive?
+
+==== 06. [10p] Virtual machine setup ====
+
+Send an ICMP echo request to one of the remote hosts and notice the ICMP redirect message. 
+  * Who sends this message? 
+  * How is this message used? Can you block this message? (Hint: [[https://www.kernel.org/doc/Documentation/networking/ip-sysctl.txt|accept_redirects]])
+  * Are there any (temporary) updates in the Linux routing table (use "ip route get" IP command)? 
+  * Update the network topology to include the new information.
+
+==== 07. [10p] Port scanning ====
+
+Now, it is time to discover the running services for each remote network. Ignore the services on the local network for the next exercises (i.e., 10.255.255.0/24). Write down the IP addresses and the open ports.
+
+<solution>
+<code>
+root@attacker:/# nmap -T4 10.5.140.0/24
+Starting Nmap 7.80 ( https://nmap.org ) at 2020-03-13 17:02 UTC
+Nmap scan report for 10.5.140.1
+Host is up (0.000020s latency).
+All 1000 scanned ports on 10.5.140.1 are closed
+
+Nmap done: 256 IP addresses (1 host up) scanned in 26.00 seconds
+</code>
+<code>
+root@attacker:/# nmap -T4 10.7.6.0/24
+Starting Nmap 7.80 ( https://nmap.org ) at 2020-03-13 17:04 UTC
+Nmap scan report for 10.7.6.1
+Host is up (0.000019s latency).
+All 1000 scanned ports on 10.7.6.1 are closed
+
+Nmap scan report for 10.7.6.2
+Host is up (0.000023s latency).
+Not shown: 999 closed ports
+PORT     STATE SERVICE
+8080/tcp open  http-proxy
+
+Nmap done: 256 IP addresses (2 hosts up) scanned in 24.93 seconds
+</code>
+<code>
+root@attacker:/# nmap -T4 10.88.205.0/24
+Starting Nmap 7.80 ( https://nmap.org ) at 2020-03-13 17:02 UTC
+Nmap scan report for 10.88.205.1
+Host is up (0.000017s latency).
+All 1000 scanned ports on 10.88.205.1 are closed
+
+Nmap scan report for 10.88.205.2
+Host is up (0.000023s latency).
+Not shown: 999 closed ports
+PORT   STATE SERVICE
+53/tcp open  domain
+
+Nmap done: 256 IP addresses (2 hosts up) scanned in 17.87 seconds
+</code>
+<code>
+root@attacker:/# nmap -T4 10.155.20.0/24
+Starting Nmap 7.80 ( https://nmap.org ) at 2020-03-13 17:04 UTC
+Nmap scan report for 10.155.20.1
+Host is up (0.000016s latency).
+All 1000 scanned ports on 10.155.20.1 are closed
+
+Nmap scan report for 10.155.20.2
+Host is up (0.000023s latency).
+Not shown: 999 closed ports
+PORT   STATE SERVICE
+80/tcp open  http
+
+Nmap done: 256 IP addresses (2 hosts up) scanned in 25.98 seconds
+</code>
+</solution>
+==== 08. [10p] Services scanning ====
+
+As you have already noticed, there is an DNS server running in the remote network. Use it to find out what is the named of the other two servers you discovered. 
+
+<solution>
+root@attacker:/# nslookup 10.7.6.2 10.88.205.2
+2.6.7.10.in-addr.arpa	name = vulnerable.iot.dashboard.
+</solution>
+
+==== 09. [15p] Virtual machine setup ====
+
+Lets try and see what the webserver offers. Unfortunately, the text-only version of Kali provides only a text-based browser, lynx. Start a capture on the interface and save it for later analysis, while browsing the website and reading Instructions webpage. The username and password for the site are admin / password. 
+  * Use Wireshark to view the passwords sent and to save the page opened. Use File->Export Objects->HTTP and change the file extension to HTML so that you can open it locally. 
+
+<note tip>
+Use 'tcpdump -Z root' to prohibit privileges dropping. 
+</note>
+
+<solution>
+<code>
+root@attacker:~/#tcpdump -Z root -n -i attacker-eth0 -w http.pcap
+tcpdump: listening on eth0, link-type EN10MB (Ethernet), capture size 262144 bytes
+^C55 packets captured
+55 packets received by filter
+0 packets dropped by kernel
+root@kali:~# lynx 10.155.20.2
+</code>
+</solution>
