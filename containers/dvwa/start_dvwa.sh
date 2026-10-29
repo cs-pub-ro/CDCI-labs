@@ -1,7 +1,6 @@
 #!/bin/bash
-# DVWA entrypoint: start embedded MariaDB, then run original DVWA setup
-# The official DVWA image expects an external DB, but we run standalone
-# in Containernet, so MariaDB is installed inside this image.
+# DVWA entrypoint: start embedded MariaDB, then run DVWA setup + Apache
+# Containernet bypasses Docker ENTRYPOINT, so this script is called via dcmd.
 
 # Start MariaDB
 mkdir -p /run/mysqld && chown mysql:mysql /run/mysqld
@@ -15,10 +14,10 @@ for i in $(seq 1 30); do
     sleep 1
 done
 
-# Point DVWA to localhost DB and run original entrypoint
+# Point DVWA to localhost DB and run original DVWA setup + Apache
 export DB_SERVER=127.0.0.1
 if [ -f /main.sh ]; then
     exec bash /main.sh
 else
-    exec "$@"
+    exec apache2-foreground
 fi

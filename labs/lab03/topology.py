@@ -24,7 +24,7 @@ HOSTS = {
     "cdci_iot": {"type": Docker, "ip": "10.7.6.2/24", "link": "sw2",
         "dimage": "cdci_base", "dcmd": "/opt/start_scripts/lab05_iot/start.sh"},
     "cdci_dvwa": {"type": Docker, "ip": "10.155.20.2/24", "link": "sw4",
-        "dimage": "dvwa", "dcmd": "apache2-foreground"},
+        "dimage": "dvwa", "dcmd": "/usr/local/bin/start_dvwa.sh"},
     "cdci_atk": {"type": Docker, "ip": "172.16.0.1/24", "link": "sw0",
                   "dimage": "cdci_base"},
     "cdci_dhcp": {"type": Docker, "ip": "10.255.255.249/24", "link": "sw0",
