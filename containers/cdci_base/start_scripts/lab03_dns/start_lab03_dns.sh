@@ -13,3 +13,4 @@ service bind9 start
 
 # Keep container alive
 while true; do sleep 100; done
+

@@ -13,3 +13,4 @@ $TTL    86400
 ;
 @       IN      NS      localhost.
 2.6.7   IN      PTR     vulnerable.iot.dashboard.
+
