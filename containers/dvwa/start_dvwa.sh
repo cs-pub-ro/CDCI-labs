@@ -1,18 +1,24 @@
 #!/bin/bash
-# DVWA entrypoint: start MariaDB then run the original CMD
-# MariaDB is required by DVWA but doesn't start automatically
-# when Containernet overrides CMD with "apache2-foreground"
+# DVWA entrypoint: start embedded MariaDB, then run original DVWA setup
+# The official DVWA image expects an external DB, but we run standalone
+# in Containernet, so MariaDB is installed inside this image.
 
-# Start MariaDB directly (no systemd in containers)
-mysqld_safe --skip-syslog &
+# Start MariaDB
+mkdir -p /run/mysqld && chown mysql:mysql /run/mysqld
+mariadbd --user=mysql &
 
 # Wait for MariaDB to be ready
 for i in $(seq 1 30); do
-    if mysqladmin ping --silent 2>/dev/null; then
+    if mariadb -e "SELECT 1" >/dev/null 2>&1; then
         break
     fi
     sleep 1
 done
 
-# Execute the original CMD (apache2-foreground)
-exec "$@"
+# Point DVWA to localhost DB and run original entrypoint
+export DB_SERVER=127.0.0.1
+if [ -f /main.sh ]; then
+    exec bash /main.sh
+else
+    exec "$@"
+fi
