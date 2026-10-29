@@ -22,5 +22,6 @@ RUN mariadb-install-db --user=mysql --datadir=/var/lib/mysql 2>/dev/null; \
 
 # Custom entrypoint: starts MariaDB, then runs original DVWA entrypoint
 COPY start_dvwa.sh /usr/local/bin/start_dvwa.sh
+RUN chmod +x /usr/local/bin/start_dvwa.sh
 ENTRYPOINT ["/usr/local/bin/start_dvwa.sh"]
 CMD ["apache2-foreground"]
