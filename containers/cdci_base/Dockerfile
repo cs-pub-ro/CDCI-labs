@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential cmake pkg-config git wget ca-certificates \
     libpcap-dev libpcre2-dev libunwind-dev libhwloc-dev \
     libluajit-5.1-dev libssl-dev zlib1g-dev libtirpc-dev \
+    libdumbnet-dev \
     flex bison liblzma-dev libnetfilter-queue-dev libmnl-dev \
     autoconf automake libtool \
  && rm -rf /var/lib/apt/lists/*
