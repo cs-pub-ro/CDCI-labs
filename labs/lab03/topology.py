@@ -11,13 +11,13 @@ from mininet.util import ipAdd, netParse, ipStr, info, waitListening
 
 SWITCHES = ["sw0", "sw1", "sw2", "sw3", "sw4"]
 HOSTS = {
-    "cdci_srv1": {"multi": True, "type": None, "ip": "10.88.205.3/24", "link":
+    "csrv1": {"multi": True, "type": None, "ip": "10.88.205.3/24", "link":
              "sw1", "dimage": "rpi-mn/base"},
-    "cdci_srv2": {"multi": True, "type": None, "ip": "10.7.6.3/24", "link":
+    "csrv2": {"multi": True, "type": None, "ip": "10.7.6.3/24", "link":
                  "sw2", "dimage": "rpi-mn/base"},
-    "cdci_srv3": {"multi": True, "type": None, "ip": "10.5.140.3/24", "link":
+    "csrv3": {"multi": True, "type": None, "ip": "10.5.140.3/24", "link":
                  "sw3", "dimage": "rpi-mn/base"},
-    "cdci_srv4": {"multi": True, "type": None, "ip": "10.155.20.3/24", "link":
+    "csrv4": {"multi": True, "type": None, "ip": "10.155.20.3/24", "link":
                  "sw4", "dimage": "rpi-mn/base"},
     "cdci_dns": {"type": Docker, "ip": "10.88.205.2/24", "link": "sw1",
         "dimage": "cdci_base", "dcmd": "/opt/start_scripts/lab03_dns/start_lab03_dns.sh"},
@@ -71,7 +71,7 @@ ROUTES = {
     }
 NETWORKS = {
     "lab03": ["cdci_dhcp", "cdci_dns", "cdci_iot", "cdci_dvwa", "cdci_atk",
-              "cdci_srv1", "cdci_srv2", "cdci_srv3", "cdci_srv4"],
+              "csrv1", "csrv2", "csrv3", "csrv4"],
 }
 
 class LinuxRouter(Node):
