@@ -1,6 +1,6 @@
 #!/bin/bash
-# DVWA entrypoint: start embedded MariaDB, then run DVWA setup + Apache
-# Containernet bypasses Docker ENTRYPOINT, so this script is called via dcmd.
+# DVWA startup: start embedded MariaDB, then Apache.
+# Containernet bypasses Docker ENTRYPOINT, so this runs via dcmd.
 
 # Start MariaDB
 mkdir -p /run/mysqld && chown mysql:mysql /run/mysqld
@@ -14,10 +14,5 @@ for i in $(seq 1 30); do
     sleep 1
 done
 
-# Point DVWA to localhost DB and run original DVWA setup + Apache
-export DB_SERVER=127.0.0.1
-if [ -f /main.sh ]; then
-    exec bash /main.sh
-else
-    exec apache2-foreground
-fi
+# Start Apache in foreground (DVWA config already defaults to 127.0.0.1)
+exec apache2-foreground
