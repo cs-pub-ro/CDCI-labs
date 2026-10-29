@@ -13,7 +13,10 @@ git pull
 echo "[*] Rebuilding Docker images..."
 cd containers
 sudo make -C cdci_base
-sudo docker builder prune -f --all
 sudo make -C dvwa
+
+# Clean up build cache after all images are built
+sudo docker builder prune -f
+sudo docker system prune -f
 
 echo "[*] Update complete!"
