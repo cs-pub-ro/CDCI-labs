@@ -12,7 +12,7 @@ RUN apt-get update \
 
 # Initialize MariaDB and create the DVWA database + user
 RUN mariadb-install-db --user=mysql --datadir=/var/lib/mysql 2>/dev/null; \
-    mariadbd --user=mysql & \
+    mariadbd-safe & \
     for i in $(seq 1 30); do mariadb -e "SELECT 1" >/dev/null 2>&1 && break; sleep 1; done && \
     mariadb -e "CREATE DATABASE IF NOT EXISTS dvwa;" && \
     mariadb -e "CREATE USER IF NOT EXISTS 'dvwa'@'127.0.0.1' IDENTIFIED BY 'p@ssw0rd';" && \

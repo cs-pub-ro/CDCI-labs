@@ -5,7 +5,7 @@
 
 # Start MariaDB
 mkdir -p /run/mysqld && chown mysql:mysql /run/mysqld
-mariadbd --user=mysql &
+mariadbd-safe &
 
 # Wait for MariaDB to be ready
 for i in $(seq 1 30); do
