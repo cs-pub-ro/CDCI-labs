@@ -28,7 +28,7 @@ WORKDIR /usr/src
 RUN git clone --depth 1 --branch ${LIBDAQ_VERSION} https://github.com/snort3/libdaq.git && \
     cd libdaq && \
     ./bootstrap && ./configure --prefix=/usr/local && \
-    make -j$(nproc) && make install
+    make -j$(( $(nproc) < 4 ? $(nproc) : 4 )) && make install
 
 # Build Snort 3
 RUN git clone --depth 1 --branch ${SNORT_VERSION} https://github.com/snort3/snort3.git && \
@@ -37,7 +37,7 @@ RUN git clone --depth 1 --branch ${SNORT_VERSION} https://github.com/snort3/snor
     find . -name CMakeLists.txt -exec sed -i 's/cmake_minimum_required(VERSION 2\./cmake_minimum_required(VERSION 3.5) #was 2./' {} + 2>/dev/null || true && \
     find . -name CMakeLists.txt -exec sed -i 's/cmake_minimum_required(VERSION 3\.0)/cmake_minimum_required(VERSION 3.5)/' {} + 2>/dev/null || true && \
     ./configure_cmake.sh --prefix=/usr/local && \
-    cd build && make -j$(nproc) && make install && ldconfig
+    cd build && make -j$(( $(nproc) < 4 ? $(nproc) : 4 )) && make install && ldconfig
 
 # ============================================================
 # Stage 2: Runtime — all tools + Snort 3 binaries
