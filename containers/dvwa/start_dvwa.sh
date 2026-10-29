@@ -16,3 +16,4 @@ done
 
 # Execute the original CMD (apache2-foreground)
 exec "$@"
+
