@@ -4,6 +4,11 @@
 
 set -e
 
+if [ "$(id -u)" -ne 0 ]; then
+	echo "Error: run as root" >&2
+	exit 1
+fi
+
 echo "=== CDCI Cleanup ==="
 
 # 1. Run Mininet's built-in cleanup (handles interfaces, namespaces, OVS, etc.)
