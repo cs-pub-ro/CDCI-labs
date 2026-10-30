@@ -34,7 +34,7 @@ def myNetwork():
         "dcmd": "/usr/local/bin/start_app.sh",
         "ip": "192.168.16.100/24",
     }
-    H2 = net.addDocker('cdci_victim', **mn_args)
+    H2 = net.addDocker('cdci_vic', **mn_args)
 
     info( '*** Add links\n')
     net.addLink( H1, s1 )
@@ -57,5 +57,5 @@ def myNetwork():
     net.stop()
 
 if __name__ == '__main__':
-    setLogLevel( 'info' )
+    setLogLevel( 'critical' )
     myNetwork()

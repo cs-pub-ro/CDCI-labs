@@ -57,5 +57,5 @@ def myNetwork():
     net.stop()
 
 if __name__ == '__main__':
-    setLogLevel( 'info' )
+    setLogLevel( 'critical' )
     myNetwork()

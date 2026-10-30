@@ -198,7 +198,7 @@ class CDCITopology():
 
 if __name__ == '__main__':
     # Tell mininet to print useful information
-    setLogLevel('info')
+    setLogLevel('critical')
     topo = CDCITopology()
     net = Containernet(controller=Controller)
     topo.configure_network(net, "lab03",1)
