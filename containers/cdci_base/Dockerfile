@@ -65,7 +65,7 @@ RUN apt-get update \
       libluajit-5.1-2 libssl3t64 zlib1g libtirpc3t64 \
       libnetfilter-queue1 libmnl0 libdumbnet1 libnuma1 \
       # Utilities
-      vim bsdmainutils \
+      vim bsdmainutils asciinema \
  && rm -rf /var/lib/apt/lists/*
 
 # Copy compiled Snort 3 + LibDAQ from builder
