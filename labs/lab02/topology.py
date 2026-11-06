@@ -34,7 +34,7 @@ def myNetwork():
         "dimage": "cdci_base",
         "dcmd": "/usr/local/bin/start_app.sh",
         "ip": "192.168.16.100/24",
-        "hostname": "victim",
+        "hostname": "defender",
     }
     H2 = net.addDocker('cdci_h2', **mn_args)
 

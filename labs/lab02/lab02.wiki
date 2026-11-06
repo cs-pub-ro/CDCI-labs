@@ -1,10 +1,32 @@
 ====== Lab02. Practical cryptography  ======
 
+<note important>
+**CDCI Framework Context**
+
+Cryptography is a foundational control across multiple cyber defense frameworks:
+  * **NIST CSF 2.0** — //Protect (PR)//: PR.DS — Data Security (encryption at rest and in transit), PR.AA — Identity Management and Access Control (certificates, key management)
+  * **NIS2 Directive** — Article 21(2)(e): //use of cryptography and, where appropriate, encryption//
+  * **MITRE ATT&CK** — Understanding cryptography helps defend against: T1557 (Adversary-in-the-Middle), T1040 (Network Sniffing), T1114 (Email Collection), T1588.004 (Obtain Capabilities: Digital Certificates)
+  * **CWE** — CWE-327 (Use of a Broken or Risky Cryptographic Algorithm), CWE-328 (Use of Weak Hash), CWE-916 (Use of Password Hash With Insufficient Computational Effort)
+
+Throughout this lab, pay attention to **why** each cryptographic primitive exists and **which framework controls** it satisfies.
+</note>
+
+<note warning>
+Important read to be graded!
+{{page>:cdci:rec&nofooter&noeditbutton&noheader}}
+</note>
+
 ===== Objectives =====
 
   * Hashing data to provide integrity
   * Use openssl for symmetric and asymmetric encryption
-  * Convert to base64 an encrypted message
+  * Understand the difference between encryption modes (ECB vs CBC vs CTR)
+  * Use HMAC for authenticated message integrity
+  * Create and verify digital signatures and certificates
+  * Build a private Certificate Authority and sign certificates
+  * Assess TLS configurations from a defense perspective
+  * Understand password hashing and the importance of computational cost
 
 ===== Topology =====
 
@@ -31,97 +53,197 @@ root@cdci:/# /usr/bin/python3 topology.py
 
 If there are any problems with starting the topology (if all is good you should see the Mininet prompt ">") use the given cleanup script and try to restart the topology.
 
-==== 02. [10p] Internet connectivity ====
+==== 02. [5p] Internet connectivity ====
 
-Before you begin, make sure that you have Internet connectivity on all two nodes. R1 should be the gateway for the all of them. Write down the IP addresses of all the nodes (including the gateway). Use the provided scripts to access the nodes.
+Before you begin, make sure that you have Internet connectivity on both nodes. The NAT gateway (192.168.16.1) should provide Internet access. Write down the IP addresses of all the nodes (including the gateway). Use the provided scripts to access the nodes.
 
-Download the following archive and extract it both nodes (Hint: wget is installed). https://ocw.cs.pub.ro/courses/_media/cdci/labs/upb-vs-harvard.zip . Download the archive also on your local computer and inspect the images.
+Download the following archive and extract it on both nodes (Hint: wget is installed). https://ocw.cs.pub.ro/courses/_media/cdci/labs/upb-vs-harvard.zip . Download the archive also on your local computer and inspect the images.
 
 <code>
-root@ip-172-30-0-165:/# ./h1.sh 
+root@cdci:/home/student/CDCI-labs/labs/lab02# ./attacker.sh 
 root@attacker:/# 
 
-root@ip-172-30-0-165:/# ./h2.sh 
-root@victim:/# 
+root@cdci:/home/student/CDCI-labs/labs/lab02# ./defender.sh 
+root@defender:/# 
 </code>
 
 
 <solution>
 <code>
-root@h2:~# wget https://ocw.cs.pub.ro/courses/_media/cdci/labs/upb-vs-harvard.zip
-root@h2:~# unzip upb-vs-harvard.zip 
-root@h2:~# pwd  
+root@attacker:~# wget https://ocw.cs.pub.ro/courses/_media/cdci/labs/upb-vs-harvard.zip
+root@attacker:~# unzip upb-vs-harvard.zip 
+root@attacker:~# pwd  
+
+root@defender:~# wget https://ocw.cs.pub.ro/courses/_media/cdci/labs/upb-vs-harvard.zip
+root@defender:~# unzip upb-vs-harvard.zip 
 </code>
 </solution>
+
 ==== 03. [10p] Hashing ====
+
+<note>
+**NIST CSF:** PR.DS-1 — Data-at-rest is protected. Hashing provides data //integrity// — the ability to detect unauthorized modification. This maps to the **Detect** function of the NIST CSF.
+</note>
 
   - Use the MD5 hashing function and compare the files from the archive extracted previously. How do the hashes differ? What about the files, are they the same? Now, use other hashing functions and compare the result. 
   - Download the latest version of the Firefox browser for Windows and compare the hash value to the official one.
     - http://releases.mozilla.org/pub/firefox/releases/65.0b9/win64/en-US/ 
     - http://releases.mozilla.org/pub/firefox/releases/65.0b9/SHA256SUMS
 
+<note important>
+**Think about it:** The two BMP files produce the same MD5 hash but look completely different. This is an example of a //hash collision//. From a CDCI perspective: which **CWE** does relying on MD5 for integrity map to? Why does NIST SP 800-131A deprecate MD5 for digital signatures?
+</note>
+
 <solution>
 <code>
-root@h1:~/upb-vs-harvard# md5sum upb.bmp 
+root@attacker:~/upb-vs-harvard# md5sum upb.bmp 
 2cbfabbbfb2adf0fea6ff8fbbaeaabae  upb.bmp
-root@h1:~/upb-vs-harvard# md5sum harvard.bmp 
+root@attacker:~/upb-vs-harvard# md5sum harvard.bmp 
 2cbfabbbfb2adf0fea6ff8fbbaeaabae  harvard.bmp  
 
-root@h1:~/#  wget http://releases.mozilla.org/pub/firefox/releases/65.0b9/win64/en-US/Firefox%20Setup%2065.0b9.exe
-root@h1:~/#  sha256sum Firefox\ Setup\ 65.0b9.exe
+root@attacker:~/upb-vs-harvard# sha256sum upb.bmp harvard.bmp
+# SHA-256 hashes are different — no known collision attacks
+
+root@attacker:~/#  wget http://releases.mozilla.org/pub/firefox/releases/65.0b9/win64/en-US/Firefox%20Setup%2065.0b9.exe
+root@attacker:~/#  sha256sum Firefox\ Setup\ 65.0b9.exe
+
+# Answer: CWE-328 (Use of Weak Hash) — MD5 is computationally broken for collision resistance
 </code>
 </solution>
+
 ==== 04. [10p] Symmetric encryption ====
 
-The openssl tool provides different mechanisms to encrypt data using symmetric cyphers. List all the available cyphers and modes of operation. Encrypt the ‘This is a cool lab’ text using aes-256-cbc mode and the password ‘thisisasupersecretpassword’. The output of the previous command is a not human-readable and cannot be easily used, add the ‘-base64’ parameter and verify the output. 
+The openssl tool provides different mechanisms to encrypt data using symmetric cyphers. List all the available cyphers and modes of operation. Encrypt the 'This is a cool lab' text using aes-256-cbc mode and the password 'thisisasupersecretpassword'. The output of the previous command is a not human-readable and cannot be easily used, add the '-base64' parameter and verify the output. 
   * Copy and decrypt the message on the other node. 
 
 <solution>
 <code>
-root@h1:~# openssl list -cipher-commands
+root@attacker:~# openssl list -cipher-commands
 aes-128-cbc       aes-128-ecb       aes-192-cbc       aes-192-ecb       
 [...]
-root@h1:~# echo "This is a cool lab" | openssl aes-256-cbc -k thisisasupersecretpassword
-root@h1:~# echo "This is a cool lab" | openssl aes-256-cbc -k thisisasupersecretpassword -md sha512 -p -base64 -pbkdf2
+root@attacker:~# echo "This is a cool lab" | openssl aes-256-cbc -k thisisasupersecretpassword
+root@attacker:~# echo "This is a cool lab" | openssl aes-256-cbc -k thisisasupersecretpassword -md sha512 -p -base64 -pbkdf2
 salt=1F678051A7D00C6F
 key=C46100F8145E3C58BECD235C6F55C8CBD2CDCC15ACD9EB35C7815E70CF97330A
 iv =9B51ACC36B704923244B65190C3A1A0B
 U2FsdGVkX18fZ4BRp9AMb3QeOQYXFoR0lFCO7tXYAXiQ/tJmwAsbOM8yYjmWD6ku
 
-root@h2:~# echo "U2FsdGVkX18fZ4BRp9AMb3QeOQYXFoR0lFCO7tXYAXiQ/tJmwAsbOM8yYjmWD6ku" | openssl aes-256-cbc -k thisisasupersecretpassword -md sha512 -base64 -d -pbkdf2
+root@defender:~# echo "U2FsdGVkX18fZ4BRp9AMb3QeOQYXFoR0lFCO7tXYAXiQ/tJmwAsbOM8yYjmWD6ku" | openssl aes-256-cbc -k thisisasupersecretpassword -md sha512 -base64 -d -pbkdf2
 This is a cool lab
 </code>
 </solution>
 
-==== 05. [15p] ECB-mode encryption ====
+==== 05. [15p] ECB vs CBC vs CTR — Encryption modes ====
 
-In this exercise we will show how using a wrong encryption mode can break the encryption scheme. Let us try to encrypt the upb.bmp image using the AES-256-ECB mode. 
-  * Encrypt the image file using AES-256-ECB.
-  * Recover the image-related metadata / header . This is required if we want the picture to be displayed properly. Note that the header is 54 bytes ([[http://www.onicos.com/staff/iz/formats/bmp.html|http://www.onicos.com/staff/iz/formats/bmp.html]]). You can use the "dd" tool for this purpose. 
-  * Last, transfer the encrypted image to your file (from the node to the virtual machine, and from the virtual machine to your computer).
+<note>
+**CWE-327:** Use of a Broken or Risky Cryptographic Algorithm. ECB mode is a textbook example of a //technically correct// algorithm used in an //insecure mode//.
+</note>
+
+In this exercise we will show how choosing the wrong encryption mode can break the encryption scheme, even when the underlying algorithm (AES-256) is strong.
+
+  * Encrypt the ''upb.bmp'' image file using **AES-256-ECB** mode.
+  * Now encrypt the same file using **AES-256-CBC** and **AES-256-CTR** modes.
+  * For all three encrypted files, recover the BMP header (first 54 bytes) from the original file so the images can be displayed. The header format is documented here: [[http://www.onicos.com/staff/iz/formats/bmp.html|BMP format]]. Use the ''dd'' tool.
+  * Transfer all three encrypted images to your local machine and compare them visually.
+
+<note important>
+**Questions to answer:**
+  - Why can you still recognize the original image in the ECB-encrypted version?
+  - Why do CBC and CTR not have this problem?
+  - In which NIST CSF subcategory would selecting the correct encryption mode fall?
+  - A security auditor finds that your organization encrypts database backups using AES-256-ECB. Which CWE would you file this under?
+</note>
 
 <note tip>
-You can transfer file from the nodes (docker containers) to the host (virtual machine) using scp. Alternatively, you can use the provided ''copy_from_node.sh'' script: ''./copy_from_node.sh h1 /root/upb_logo_enc.bmp ~/.''.
+You can transfer files from the nodes (docker containers) to the host (virtual machine) using scp. Alternatively, you can use the provided ''copy_from_node.sh'' script: ''./copy_from_node.sh attacker /root/upb_logo_enc_ecb.bmp ~/.''
 </note>
 
 <solution>
 <code>
-root@h1:~/# openssl aes-256-ecb -k thisisasupersecretpassword -in upb.bmp -out upb_logo_enc.bmp -nosalt -pbkdf2
-root@h1:~/# dd if=upb.bmp of=upb_logo_enc.bmp bs=6 count=9 conv=notrunc
-9+0 records in
-9+0 records out
-54 bytes copied, 5.6056e-05 s, 963 kB/s
-root@h1:~/# scp upb_logo_enc.bmp ubuntu@192.168.16.1:~/.
-ubuntu@192.168.16.1's password: 
-upb_logo_enc.bmp                                                     100%  733KB 381.8KB/s   00:01  
+# ECB mode
+root@attacker:~/upb-vs-harvard# openssl aes-256-ecb -k thisisasupersecretpassword -in upb.bmp -out upb_enc_ecb.bmp -nosalt -pbkdf2
+
+# CBC mode
+root@attacker:~/upb-vs-harvard# openssl aes-256-cbc -k thisisasupersecretpassword -in upb.bmp -out upb_enc_cbc.bmp -nosalt -pbkdf2
+
+# CTR mode
+root@attacker:~/upb-vs-harvard# openssl aes-256-ctr -k thisisasupersecretpassword -in upb.bmp -out upb_enc_ctr.bmp -nosalt -pbkdf2
+
+# Restore BMP headers for all three
+root@attacker:~/upb-vs-harvard# dd if=upb.bmp of=upb_enc_ecb.bmp bs=6 count=9 conv=notrunc
+root@attacker:~/upb-vs-harvard# dd if=upb.bmp of=upb_enc_cbc.bmp bs=6 count=9 conv=notrunc
+root@attacker:~/upb-vs-harvard# dd if=upb.bmp of=upb_enc_ctr.bmp bs=6 count=9 conv=notrunc
+
+# Transfer to VM
+root@attacker:~/upb-vs-harvard# scp upb_enc_*.bmp ubuntu@192.168.16.1:~/.
+
+# ECB: you can still see the outline of the original image (identical plaintext blocks → identical ciphertext blocks)
+# CBC/CTR: random noise — each block depends on IV/counter, so identical plaintext blocks produce different ciphertext
+
+# Answers:
+# 1. ECB encrypts each 16-byte block independently — identical blocks → identical ciphertext → visible patterns
+# 2. CBC chains blocks (each block XORed with previous ciphertext); CTR uses a unique counter per block
+# 3. NIST CSF PR.DS — selecting appropriate cryptographic protections for data security
+# 4. CWE-327 — Use of a Broken or Risky Cryptographic Algorithm
 </code>
 </solution>
 
+==== 06. [10p] HMAC — Authenticated integrity ====
 
+<note>
+**NIST CSF:** PR.DS-6 — Integrity checking mechanisms are used to verify software, firmware, and information integrity. HMAC adds a //shared secret// to the hash, preventing an attacker from simply recomputing the hash after modifying the data.
+</note>
 
-==== 06. [10p] Digital signing ==== 
+In Task 03, you used ''md5sum'' and ''sha256sum'' to verify file integrity. But an attacker who modifies a file can also recompute its hash. HMAC (Hash-based Message Authentication Code) solves this by requiring a shared secret key.
 
-Symmetric encryption is typically used for encrypting data, hashing is used for data integrity and asymmetric encryption is used for authentication. We can use ‘openssl dgst’ tool for signing files using DSA.
+  * On the attacker node, create a text file ''message.txt'' with some content.
+  * Compute a plain SHA-256 hash of the file: ''sha256sum message.txt''
+  * Now compute an HMAC-SHA256 using a shared secret: ''openssl dgst -sha256 -hmac "mysecretkey" message.txt''
+  * Send both the file and the HMAC to the defender node. Verify the HMAC on the defender.
+  * Now simulate a tampering attack: modify ''message.txt'' on the defender node and recompute both the plain hash and the HMAC. What happens?
+
+<note important>
+**Questions to answer:**
+  - An attacker intercepts ''message.txt'' and its SHA-256 hash. Can the attacker modify both without detection? What about the HMAC?
+  - When would you use HMAC instead of a digital signature? (Hint: think about key distribution and performance)
+  - Which MITRE ATT&CK technique does HMAC help defend against?
+</note>
+
+<solution>
+<code>
+root@attacker:~# echo "This is the original message" > message.txt
+
+# Plain hash — anyone can compute this
+root@attacker:~# sha256sum message.txt
+a1b2c3d4...  message.txt
+
+# HMAC — requires the secret key
+root@attacker:~# openssl dgst -sha256 -hmac "mysecretkey" message.txt
+HMAC-SHA256(message.txt)= 7f8e9d...
+
+# Send to defender (via VM)
+root@attacker:~# scp message.txt ubuntu@192.168.16.1:~/.
+
+# On defender: verify
+root@defender:~# scp ubuntu@192.168.16.1:~/message.txt .
+root@defender:~# openssl dgst -sha256 -hmac "mysecretkey" message.txt
+# Same HMAC → integrity verified
+
+# Tamper and recompute
+root@defender:~# echo "tampered" >> message.txt
+root@defender:~# sha256sum message.txt              # different hash — but attacker can compute this too
+root@defender:~# openssl dgst -sha256 -hmac "mysecretkey" message.txt  # different HMAC — attacker can't forge without the key
+
+# Answers:
+# 1. Plain hash: yes, attacker recomputes. HMAC: no, attacker needs the secret key.
+# 2. HMAC: symmetric (faster, simpler), both parties share the secret. Digital signatures: asymmetric, non-repudiation.
+# 3. T1557 (Adversary-in-the-Middle) — HMAC detects message modification in transit
+</code>
+</solution>
+
+==== 07. [10p] Digital signing ==== 
+
+Symmetric encryption is typically used for encrypting data, hashing is used for data integrity and asymmetric encryption is used for authentication. We can use 'openssl dgst' tool for signing files using DSA.
   * Create a DSA key pair and use it to sign the image file encrypted before. Use SHA256 for hashing the file.
   * Send the signed data to the other node and verify the signature. How could you distribute the public part of the DSA key?
 
@@ -131,94 +253,222 @@ For file transfer between the two nodes you can use scp via the virtual machine,
 
 <solution>
 <code>
-root@h1:~/# openssl genpkey -genparam -algorithm DSA -pkeyopt dsa_paramgen_bits:2048 -pkeyopt dsa_paramgen_q_bits:256 -pkeyopt dsa_paramgen_md:sha256 -out dsaparams.pem
-root@h1:~/# openssl genpkey -paramfile dsaparams.pem -out dsaprivkey.pem
-root@h1:~/# openssl dsa -in dsaprivkey.pem -pubout > dsapubkey.pem
-root@h1:~/# openssl dgst -sha256 -sign dsaprivkey.pem upb_logo_enc.bmp > upb.sig
-root@h1:~/# scp upb_logo_enc.bmp upb.sig dsapubkey.pem ubuntu@192.168.16.1:~/.
+root@attacker:~/# openssl genpkey -genparam -algorithm DSA -pkeyopt dsa_paramgen_bits:2048 -pkeyopt dsa_paramgen_q_bits:256 -pkeyopt dsa_paramgen_md:sha256 -out dsaparams.pem
+root@attacker:~/# openssl genpkey -paramfile dsaparams.pem -out dsaprivkey.pem
+root@attacker:~/# openssl dsa -in dsaprivkey.pem -pubout > dsapubkey.pem
+root@attacker:~/# openssl dgst -sha256 -sign dsaprivkey.pem upb_enc_ecb.bmp > upb.sig
+root@attacker:~/# scp upb_enc_ecb.bmp upb.sig dsapubkey.pem ubuntu@192.168.16.1:~/.
 
-root@h2:~# scp ubuntu@192.168.16.1:~/upb.sig ubuntu@192.168.16.1:~/upb_logo_enc.bmp ubuntu@192.168.16.1:~/dsapubkey.pem .
-root@h2:~# ls
-dsapubkey.pem  upb.sig  upb_logo_enc.bmp
-root@h2:~# openssl dgst -sha256 -verify dsapubkey.pem -signature upb.sig upb_logo_enc.bmp
+root@defender:~# scp ubuntu@192.168.16.1:~/upb.sig ubuntu@192.168.16.1:~/upb_enc_ecb.bmp ubuntu@192.168.16.1:~/dsapubkey.pem .
+root@defender:~# ls
+dsapubkey.pem  upb.sig  upb_enc_ecb.bmp
+root@defender:~# openssl dgst -sha256 -verify dsapubkey.pem -signature upb.sig upb_enc_ecb.bmp
 Verified OK
 </code>
 </solution>
 
-==== 07. [10p] Certificate Signing Request ==== 
+==== 08. [10p] Certificate Signing Request ==== 
 
 Asymmetric encryption schemes are used in certificates to authenticate and encrypt data in transit. In this exercise we are going to create a CSR (Certificate Signing Request), which includes the public key of your server. Note that this CSR must be signed by a Certificate Authority before being used. 
-  * Generate a 2048 bits private-public RSA key. Note, that while in practice the private key should be protected using a symmetric key, in this lab we assume that you don’t. Display the public key part of the generated pair. How about the private one?
-  * Use the previously generated key and create a new CSR that should be saved to the ‘ServerCertificateRequest.csr’ file. 
+  * Generate a 2048 bits private-public RSA key. Note, that while in practice the private key should be protected using a symmetric key, in this lab we assume that you don't. Display the public key part of the generated pair. How about the private one?
+  * Use the previously generated key and create a new CSR that should be saved to the 'ServerCertificateRequest.csr' file. 
   * Print the public key stored in the CSR certificate and compare it with the one generated in the first step. 
 
 <solution>
 <code>
-root@h1:~# openssl genrsa -out RSAKEYPAIR.pem 2048
-root@h1:~# openssl rsa -in RSAKEYPAIR.pem -pubout
-root@h1:~# openssl rsa -in RSAKEYPAIR.pem -text
-root@h1:~# openssl req -out ServerCertificateRequest.csr -new -key RSAKEYPAIR.pem
-root@h1:~# openssl req -in ServerCertificateRequest.csr -pubkey
+root@attacker:~# openssl genrsa -out RSAKEYPAIR.pem 2048
+root@attacker:~# openssl rsa -in RSAKEYPAIR.pem -pubout
+root@attacker:~# openssl rsa -in RSAKEYPAIR.pem -text
+root@attacker:~# openssl req -out ServerCertificateRequest.csr -new -key RSAKEYPAIR.pem
+root@attacker:~# openssl req -in ServerCertificateRequest.csr -pubkey
 </code>
 </solution>
 
-==== 08. [10p] Digital signing ==== 
+==== 09. [15p] Build your own Certificate Authority ====
 
-In this exercise you will be required to analyze an already signed certificate from the www.google.com website.
-  * Use the s_client suite from openssl and download the top chain certificate locally (Hint: signed by GlobalSign Root CA). Note that there might be a chain of certificates, save each one in a different file.
-  * What is the public key of the certificate? Compare it to the one viewed in browser (use Firefox for a simplified view).
-  * Use ‘openssl verify’ to test the correctness of the certificate. Does the verification of the certificate work? 
+<note>
+**NIST CSF:** PR.DS-2 — Data-in-transit is protected. Certificates are the backbone of TLS. Understanding how CAs work is essential for defending against T1557 (Adversary-in-the-Middle) and detecting T1588.004 (Obtain Capabilities: Digital Certificates) in threat intelligence.
+</note>
+
+In this exercise you will create your own private Certificate Authority (CA), use it to sign the CSR from the previous task, and verify the resulting certificate chain. This mirrors how organizations deploy internal PKI for securing internal services.
+
+  * **Step 1 — Create a root CA key and self-signed certificate:**
+    * Generate a 4096-bit RSA key for the CA
+    * Create a self-signed root certificate (valid for 3650 days) with subject ''/C=RO/O=CDCI Lab/CN=CDCI Root CA''
+
+  * **Step 2 — Sign the server CSR from Task 08:**
+    * Use the CA certificate and key to sign ''ServerCertificateRequest.csr''
+    * Output the signed certificate to ''server.crt'' (valid for 365 days)
+
+  * **Step 3 — Verify the chain:**
+    * Use ''openssl verify'' with ''-CAfile'' to verify ''server.crt'' against your root CA
+    * Inspect the signed certificate — who is the issuer? Who is the subject?
+
+<note important>
+**Questions to answer:**
+  - What is the difference between a self-signed certificate and a CA-signed certificate?
+  - Why do browsers trust certificates from Let's Encrypt or DigiCert but not from your CDCI Root CA?
+  - In an enterprise environment, how would you distribute your root CA certificate to all employee devices? (Hint: think about **NIST CSF ID.AM** — Asset Management)
+  - An attacker creates their own CA and signs a certificate for ''biscuits.cs.pub.ro''. What must they also do for a victim's browser to trust it? Which MITRE ATT&CK technique is this?
+</note>
 
 <solution>
 <code>
-root@h1:/# openssl s_client -host www.google.com -port 443 -prexit -showcerts
-root@h1:/# cat www.google.pem 
------BEGIN CERTIFICATE-----
-MIIESjCCAzKgAwIBAgINAeO0mqGNiqmBJWlQuDANBgkqhkiG9w0BAQsFADBMMSAw
-HgYDVQQLExdHbG9iYWxTaWduIFJvb3QgQ0EgLSBSMjETMBEGA1UEChMKR2xvYmFs
-U2lnbjETMBEGA1UEAxMKR2xvYmFsU2lnbjAeFw0xNzA2MTUwMDAwNDJaFw0yMTEy
-MTUwMDAwNDJaMEIxCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVHb29nbGUgVHJ1c3Qg
-U2VydmljZXMxEzARBgNVBAMTCkdUUyBDQSAxTzEwggEiMA0GCSqGSIb3DQEBAQUA
-A4IBDwAwggEKAoIBAQDQGM9F1IvN05zkQO9+tN1pIRvJzzyOTHW5DzEZhD2ePCnv
-UA0Qk28FgICfKqC9EksC4T2fWBYk/jCfC3R3VZMdS/dN4ZKCEPZRrAzDsiKUDzRr
-mBBJ5wudgzndIMYcLe/RGGFl5yODIKgjEv/SJH/UL+dEaltN11BmsK+eQmMF++Ac
-xGNhr59qM/9il71I2dN8FGfcddwuaej4bXhp0LcQBbjxMcI7JP0aM3T4I+DsaxmK
-FsbjzaTNC9uzpFlgOIg7rR25xoynUxv8vNmkq7zdPGHXkxWY7oG9j+JkRyBABk7X
-rJfoucBZEqFJJSPk7XA0LKW0Y3z5oz2D0c1tJKwHAgMBAAGjggEzMIIBLzAOBgNV
-HQ8BAf8EBAMCAYYwHQYDVR0lBBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMBIGA1Ud
-EwEB/wQIMAYBAf8CAQAwHQYDVR0OBBYEFJjR+G4Q68+b7GCfGJAboOt9Cf0rMB8G
-A1UdIwQYMBaAFJviB1dnHB7AagbeWbSaLd/cGYYuMDUGCCsGAQUFBwEBBCkwJzAl
-BggrBgEFBQcwAYYZaHR0cDovL29jc3AucGtpLmdvb2cvZ3NyMjAyBgNVHR8EKzAp
-MCegJaAjhiFodHRwOi8vY3JsLnBraS5nb29nL2dzcjIvZ3NyMi5jcmwwPwYDVR0g
-BDgwNjA0BgZngQwBAgIwKjAoBggrBgEFBQcCARYcaHR0cHM6Ly9wa2kuZ29vZy9y
-ZXBvc2l0b3J5LzANBgkqhkiG9w0BAQsFAAOCAQEAGoA+Nnn78y6pRjd9XlQWNa7H
-TgiZ/r3RNGkmUmYHPQq6Scti9PEajvwRT2iWTHQr02fesqOqBY2ETUwgZQ+lltoN
-FvhsO9tvBCOIazpswWC9aJ9xju4tWDQH8NVU6YZZ/XteDSGU9YzJqPjY8q3MDxrz
-mqepBCf5o8mw/wJ4a2G6xzUr6Fb6T8McDO22PLRL6u3M4Tzs3A2M1j6bykJYi8wW
-IRdAvKLWZu/axBVbzYmqmwkm5zLSDW5nIAJbELCQCZwMH56t2Dvqofxs6BBcCFIZ
-USpxu6x6td0V7SvJCCosirSmIatj/9dSSVDQibet8q/7UK4v4ZUN80atnZz1yg==
------END CERTIFICATE-----
+# Step 1: Create the Root CA
+root@attacker:~# openssl genrsa -out ca.key 4096
+root@attacker:~# openssl req -new -x509 -days 3650 -key ca.key -out ca.crt \
+    -subj "/C=RO/O=CDCI Lab/CN=CDCI Root CA"
 
-root@h1:/# openssl x509 -in www.google.pem -pubkey
------BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0BjPRdSLzdOc5EDvfrTd
-aSEbyc88jkx1uQ8xGYQ9njwp71ANEJNvBYCAnyqgvRJLAuE9n1gWJP4wnwt0d1WT
-HUv3TeGSghD2UawMw7IilA80a5gQSecLnYM53SDGHC3v0RhhZecjgyCoIxL/0iR/
-1C/nRGpbTddQZrCvnkJjBfvgHMRjYa+fajP/Ype9SNnTfBRn3HXcLmno+G14adC3
-EAW48THCOyT9GjN0+CPg7GsZihbG482kzQvbs6RZYDiIO60ducaMp1Mb/LzZpKu8
-3Txh15MVmO6BvY/iZEcgQAZO16yX6LnAWRKhSSUj5O1wNCyltGN8+aM9g9HNbSSs
-BwIDAQAB
------END PUBLIC KEY-----
+# Inspect the CA certificate
+root@attacker:~# openssl x509 -in ca.crt -text -noout | head -20
 
-root@h1:/# openssl verify -verbose www.google.pem                 
-www.google.pem: OK
+# Step 2: Sign the server CSR
+root@attacker:~# openssl x509 -req -in ServerCertificateRequest.csr \
+    -CA ca.crt -CAkey ca.key -CAcreateserial \
+    -out server.crt -days 365
 
-# if we use the first certificate
-root@h1:/# openssl verify -verbose www.google.pem 
-C = US, ST = California, L = Mountain View, O = Google LLC, CN = www.google.com
-error 20 at 0 depth lookup: unable to get local issuer certificate
-error www.google.pem: verification failed
+# Step 3: Verify the chain
+root@attacker:~# openssl verify -CAfile ca.crt server.crt
+server.crt: OK
 
+# Without CAfile — fails because our CA is not in the system trust store
+root@attacker:~# openssl verify server.crt
+error 18 at 0 depth lookup: self-signed certificate
+error server.crt: verification failed
+
+# Inspect issuer vs subject
+root@attacker:~# openssl x509 -in server.crt -issuer -subject -noout
+issuer= /C=RO/O=CDCI Lab/CN=CDCI Root CA
+subject= /C=.../O=.../CN=...
+
+# Answers:
+# 1. Self-signed: issuer == subject (no chain of trust). CA-signed: issuer is a trusted third party.
+# 2. Browser trust stores contain pre-installed root CA certificates. Our CA is not in any trust store.
+# 3. Group Policy (Windows), MDM (mobile), configuration management (Ansible/Puppet), or manual installation.
+# 4. The attacker must install their CA cert in the victim's trust store — T1553.004 (Subvert Trust Controls: Install Root Certificate)
 </code>
 </solution>
 
+==== 10. [10p] TLS reconnaissance ====
+
+<note>
+**NIST CSF:** ID.RA — Risk Assessment. Scanning TLS configurations is a core cyber defense activity. Weak ciphers and outdated protocols are catalogued as **CWE-326** (Inadequate Encryption Strength) and are flagged by compliance frameworks (PCI DSS, NIS2).
+</note>
+
+A cyber defense analyst must be able to assess the TLS configuration of their organization's services. In this exercise you will use ''nmap'' to enumerate the TLS cipher suites supported by a web server.
+
+  * Use ''nmap'' with the ''ssl-enum-ciphers'' script to scan ''biscuits.cs.pub.ro'' on port 443.
+  * Identify the TLS protocol versions supported (TLS 1.0, 1.1, 1.2, 1.3).
+  * List the cipher suites offered for each protocol version.
+  * Identify any cipher suites that nmap rates below grade **A**.
+
+<note important>
+**Questions to answer:**
+  - Which TLS versions should be disabled according to NIST SP 800-52 Rev. 2? Are they disabled on this server?
+  - Does the server support Forward Secrecy (look for ECDHE or DHE key exchange)? Why is this important from a cyber intelligence perspective? (Hint: think about retroactive decryption of captured traffic)
+  - If you were writing a security audit report for this server, which NIST CSF function and subcategory would your TLS findings fall under?
+  - An adversary has been passively recording encrypted network traffic for months. They later steal the server's private key. Which cipher suites would allow them to decrypt the old traffic? Which would not?
+</note>
+
+<solution>
+<code>
+root@attacker:~# nmap --script ssl-enum-ciphers -p 443 biscuits.cs.pub.ro
+
+# Look for:
+# - TLS 1.0 and 1.1 should NOT be present (deprecated by NIST SP 800-52 Rev. 2 and RFC 8996)
+# - TLS 1.2 and 1.3 should be present
+# - Cipher suites with ECDHE or DHE provide Forward Secrecy
+# - Cipher suites with RSA key exchange (without ECDHE/DHE) do NOT provide Forward Secrecy
+# - Grade A is ideal; anything below indicates weak configuration
+
+# Answers:
+# 1. TLS 1.0 and 1.1 must be disabled (NIST SP 800-52 Rev. 2, published 2019)
+# 2. Forward Secrecy: even if the private key is later compromised, past sessions cannot be decrypted.
+#    This is critical for CI because nation-state actors are known to record encrypted traffic (T1040).
+# 3. ID.RA (Risk Assessment) and PR.DS-2 (Data-in-transit is protected)
+# 4. RSA key exchange: old traffic decryptable. ECDHE/DHE: old traffic remains protected (new ephemeral keys per session).
+</code>
+</solution>
+
+==== 11. [10p] Password hash cracking ====
+
+<note>
+**CWE-916:** Use of Password Hash With Insufficient Computational Effort. This exercise demonstrates why using fast hashing algorithms (MD5, SHA-256) for password storage is dangerous, and why modern systems use slow, salted hashes (bcrypt, scrypt, Argon2).
+</note>
+
+An incident response team has recovered a file containing hashed passwords from a compromised server. Your task is to crack them.
+
+The file ''hashes.txt'' contains the following SHA-256 hashed passwords (one per line):
+<code>
+5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8
+8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
+5994471abb01112afcc18159f6cc74b4f511b99806da59b3caf5a9c173cacfc5
+000c285457fc971f862a79b786476c78812c8897063c6fa9c045f579a3b2d63f
+1c8bfe8f801d79745c4631d09fff36c82aa37fc4cce4fc946683d7b336b63032
+</code>
+
+  * Create ''hashes.txt'' on the attacker node with the hashes above.
+  * Write a bash script that takes a wordlist and compares SHA-256 hashes against the target hashes. Use the following wordlist: ''password, admin, 12345, qwerty, dragon, master, monkey, letmein, football, shadow''
+  * **Measure the time** it takes to crack all 5 passwords using the ''time'' command.
+  * Now imagine the password file contained 1 million hashes instead of 5. Estimate how long your script would take.
+
+<note important>
+**Questions to answer (focus on the speedup):**
+  - How many hash computations did your script perform to crack all 5 passwords? (Hint: ''number_of_hashes × number_of_words_in_wordlist'')
+  - SHA-256 is designed to be **fast**. A modern GPU can compute ~10 billion SHA-256 hashes per second. How long would it take to brute-force an 8-character lowercase password (26^8 ≈ 200 billion combinations)?
+  - The bcrypt algorithm is intentionally **slow** (~4 hashes/second on CPU with cost factor 12). How long would the same brute-force take with bcrypt?
+  - Given the speed difference, explain why **CWE-916** specifically calls out "insufficient computational effort." How does this relate to **NIST SP 800-63B** (Digital Identity Guidelines)?
+  - An organization stores passwords as ''SHA256(password)'' without salt. An attacker obtains the hash database. Describe two attack speedups beyond brute-force: (a) using a precomputed table, and (b) how salting defeats it.
+</note>
+
+<solution>
+<code>
+root@attacker:~# cat > hashes.txt << 'EOF'
+5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8
+8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
+5994471abb01112afcc18159f6cc74b4f511b99806da59b3caf5a9c173cacfc5
+000c285457fc971f862a79b786476c78812c8897063c6fa9c045f579a3b2d63f
+1c8bfe8f801d79745c4631d09fff36c82aa37fc4cce4fc946683d7b336b63032
+EOF
+
+root@attacker:~# cat > crack.sh << 'SCRIPT'
+#!/bin/bash
+WORDLIST="password admin 12345 qwerty dragon master monkey letmein football shadow"
+FOUND=0
+TOTAL=0
+
+while IFS= read -r target_hash; do
+    for word in $WORDLIST; do
+        TOTAL=$((TOTAL + 1))
+        computed=$(echo -n "$word" | sha256sum | cut -d' ' -f1)
+        if [ "$computed" = "$target_hash" ]; then
+            echo "CRACKED: $target_hash => $word"
+            FOUND=$((FOUND + 1))
+            break
+        fi
+    done
+done < hashes.txt
+
+echo "---"
+echo "Cracked: $FOUND / $(wc -l < hashes.txt)"
+echo "Total hash computations: $TOTAL"
+SCRIPT
+
+root@attacker:~# chmod +x crack.sh
+root@attacker:~# time ./crack.sh
+CRACKED: 5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8 => password
+CRACKED: 8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918 => admin
+CRACKED: 5994471abb01112afcc18159f6cc74b4f511b99806da59b3caf5a9c173cacfc5 => 12345
+CRACKED: 000c285457fc971f862a79b786476c78812c8897063c6fa9c045f579a3b2d63f => monkey
+CRACKED: 1c8bfe8f801d79745c4631d09fff36c82aa37fc4cce4fc946683d7b336b63032 => letmein
+
+# Answers:
+# 1. 5 hashes × up to 10 words each = up to 50 computations (less if found early due to break)
+# 2. 26^8 ≈ 2×10^11 / 10^10 GPU hashes/s ≈ 20 seconds — trivially fast!
+# 3. 26^8 ≈ 2×10^11 / 4 bcrypt/s ≈ 50 billion seconds ≈ ~1,585 years — computationally infeasible
+# 4. CWE-916: fast hashes let attackers check billions of candidates/sec. NIST SP 800-63B mandates
+#    memory-hard functions (Argon2, bcrypt, scrypt) with appropriate cost factors.
+# 5. (a) Rainbow tables: precomputed hash→password lookup tables enable instant cracking.
+#    (b) Salting: unique random salt per password means each entry needs its own rainbow table — infeasible.
+</code>
+</solution>
