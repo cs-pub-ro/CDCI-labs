@@ -24,7 +24,7 @@ HOSTS = {
     "cdci_iot": {"type": Docker, "ip": "10.7.6.2/24", "link": "sw2",
         "dimage": "cdci_base", "dcmd": "/opt/start_scripts/lab05_iot/start.sh"},
     "cdci_juiceshop": {"type": Docker, "ip": "10.155.20.2/24", "link": "sw4",
-        "dimage": "juiceshop", "dcmd": "/usr/local/bin/start_juiceshop.sh"},
+        "dimage": "juiceshop", "dcmd": "/nodejs/bin/node /juice-shop/build/app.js"},
     "cdci_atk": {"type": Docker, "ip": "172.16.0.1/24", "link": "sw0",
                   "dimage": "cdci_base"},
     "cdci_dhcp": {"type": Docker, "ip": "10.255.255.249/24", "link": "sw0",

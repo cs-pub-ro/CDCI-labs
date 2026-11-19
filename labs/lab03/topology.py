@@ -33,7 +33,7 @@ def myNetwork():
     mn_args = {
         "network_mode": "none",
         "dimage": "juiceshop",
-        "dcmd": "/usr/local/bin/start_juiceshop.sh",
+        "dcmd": "/nodejs/bin/node /juice-shop/build/app.js",
         "ip": "10.0.0.3/24",
     }
     juiceshop = net.addDocker('juiceshop', **mn_args)
@@ -47,7 +47,8 @@ def myNetwork():
 
     # Juice Shop needs a few seconds to start up
     info( '*** Waiting for Juice Shop to start...\n')
-    juiceshop.cmd('sleep 5')
+    import time
+    time.sleep(5)
 
     CLI(net)
     net.stop()
