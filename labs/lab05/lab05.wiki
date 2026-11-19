@@ -156,8 +156,8 @@ All 1000 scanned ports on 10.155.20.1 are closed
 Nmap scan report for 10.155.20.2
 Host is up (0.000023s latency).
 Not shown: 999 closed ports
-PORT   STATE SERVICE
-80/tcp open  http
+PORT     STATE SERVICE
+3000/tcp open  http
 
 Nmap done: 256 IP addresses (2 hosts up) scanned in 25.98 seconds
 </code>
@@ -173,8 +173,8 @@ root@attacker:/# nslookup 10.7.6.2 10.88.205.2
 
 ==== 09. [15p] Virtual machine setup ====
 
-Lets try and see what the webserver offers. Unfortunately, the text-only version of Kali provides only a text-based browser, lynx. Start a capture on the interface and save it for later analysis, while browsing the website and reading Instructions webpage. The username and password for the site are admin / password. 
-  * Use Wireshark to view the passwords sent and to save the page opened. Use File->Export Objects->HTTP and change the file extension to HTML so that you can open it locally. 
+Lets try and see what the webserver offers. Use curl or lynx to browse the website on port 3000 and explore the available pages. Start a capture on the interface and save it for later analysis.
+  * Use Wireshark to view the HTTP traffic and to save the page opened. Use File->Export Objects->HTTP and change the file extension to HTML so that you can open it locally. 
 
 <note tip>
 Use 'tcpdump -Z root' to prohibit privileges dropping. 
@@ -187,6 +187,6 @@ tcpdump: listening on eth0, link-type EN10MB (Ethernet), capture size 262144 byt
 ^C55 packets captured
 55 packets received by filter
 0 packets dropped by kernel
-root@kali:~# lynx 10.155.20.2
+root@kali:~# curl -s http://10.155.20.2:3000 | head -20
 </code>
 </solution>

@@ -2,4 +2,4 @@
 .PHONY: containers
 containers:
 	make -C cdci_base
-	make -C dvwa
+	make -C juiceshop

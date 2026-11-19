@@ -23,8 +23,8 @@ HOSTS = {
         "dimage": "cdci_base", "dcmd": "/opt/start_scripts/lab03_dns/start_lab03_dns.sh"},
     "cdci_iot": {"type": Docker, "ip": "10.7.6.2/24", "link": "sw2",
         "dimage": "cdci_base", "dcmd": "/opt/start_scripts/lab05_iot/start.sh"},
-    "cdci_dvwa": {"type": Docker, "ip": "10.155.20.2/24", "link": "sw4",
-        "dimage": "dvwa", "dcmd": "/usr/local/bin/start_dvwa.sh"},
+    "cdci_juiceshop": {"type": Docker, "ip": "10.155.20.2/24", "link": "sw4",
+        "dimage": "juiceshop", "dcmd": "/usr/local/bin/start_juiceshop.sh"},
     "cdci_atk": {"type": Docker, "ip": "172.16.0.1/24", "link": "sw0",
                   "dimage": "cdci_base"},
     "cdci_dhcp": {"type": Docker, "ip": "10.255.255.249/24", "link": "sw0",
@@ -63,14 +63,14 @@ ROUTES = {
            ("default", "10.255.255.249")],      # nat
     "cdci_dns": [("default", "10.88.205.1")],  # DNS server
     "cdci_iot": [("default", "10.7.6.1")],  # IoT server
-    "cdci_dvwa": [("default", "10.155.20.1")],  # DVWA
+    "cdci_juiceshop": [("default", "10.155.20.1")],  # Juice Shop
     "cdci_dhcp": [("10.7.6.0/24", "10.255.255.2"),
         ("10.88.205.0/24", "10.255.255.1"),
         ("10.155.20.0/24", "10.255.255.4"),
         ("10.5.140.0/24", "10.255.255.4")],  # DHCP server
     }
 NETWORKS = {
-    "lab05": ["cdci_dhcp", "cdci_dns", "cdci_iot", "cdci_dvwa", "cdci_atk",
+    "lab05": ["cdci_dhcp", "cdci_dns", "cdci_iot", "cdci_juiceshop", "cdci_atk",
               "csrv1", "csrv2", "csrv3", "csrv4"],
 }
 

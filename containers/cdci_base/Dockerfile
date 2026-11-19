@@ -2,8 +2,8 @@
 # mihai.chiroiu@upb.ro
 # https://ocw.cs.pub.ro/courses/cdci
 #
-# Unified base image: all networking tools + Snort 3
-# Used by all CDCI labs (05-09)
+# Unified base image: all networking + security tools + Snort 3
+# Used by all CDCI labs
 
 # ============================================================
 # Stage 1: Build Snort 3 + LibDAQ from source
@@ -52,6 +52,8 @@ RUN apt-get update \
       # Security / analysis
       openssl tcpdump nmap ettercap-text-only iptables \
       hping3 arpwatch arp-scan \
+      # Web security
+      nikto sqlmap ffuf jq \
       # Connectivity
       netcat-traditional netcat-openbsd wget curl unzip ssh lynx \
       # Tunneling tools

@@ -67,7 +67,7 @@ cd "$SCRIPT_DIR/containers"
 make -C cdci_base
 docker builder prune -f --all
 docker system prune -f
-make -C dvwa
+make -C juiceshop
 
 echo ""
 echo "=== Pre-built Docker images ==="
