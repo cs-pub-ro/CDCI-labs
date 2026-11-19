@@ -1,4 +1,4 @@
-====== Lab03. Malware sample analysis ======
+====== Lab11. Malware sample analysis ======
 
 ===== Objectives =====
 

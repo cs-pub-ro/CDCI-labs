@@ -24,7 +24,7 @@ First, make sure that your virtual machine is updated, run the provided update.s
 
 Next, in one terminal start the provided Mininet topology.
 <code>
-root@cdci:/# cd cdci/labs/lab03
+root@cdci:/# cd cdci/labs/lab05
 root@cdci:/# /usr/bin/python3 topology.py
 </code>
 
@@ -32,7 +32,7 @@ If there are any problems with starting the topology (if all is good you should 
 
 ==== 02. [10p] Connecting to the network ====
 
-The main goal of the lab is to discover the network infrastructure and protocols available. The attacker is connected directly into sw0 using attacker-eth0. First, login into the attacker's docker using the "attacker_bash.sh" script (from ~/cdci/labs/lab03). 
+The main goal of the lab is to discover the network infrastructure and protocols available. The attacker is connected directly into sw0 using attacker-eth0. First, login into the attacker's docker using the "attacker_bash.sh" script (from ~/cdci/labs/lab05). 
 
 The network uses DHCP, so you can get an IP address. Investigate the obtained resources via the DHCP protocol (IP address, routes, etc.) and write them down.
 
