@@ -4,9 +4,9 @@
 **CDCI Framework Context**
 
 Web application vulnerabilities are the most common attack surface on the Internet. This lab maps directly to multiple cyber defense frameworks:
-  * **OWASP Top 10 (2021)** — The industry standard for web application security risks. Today you will exploit: //A01 Broken Access Control//, //A03 Injection//, //A05 Security Misconfiguration//
+  * **OWASP Top 10 (2025)** — The industry standard for web application security risks. Today you will exploit: //A01 Broken Access Control//, //A02 Security Misconfiguration//, //A05 Injection//
   * **NIST CSF 2.0** — //Protect (PR)//: PR.AA — Identity Management and Access Control, PR.DS — Data Security; //Detect (DE)//: DE.CM — Continuous Monitoring
-  * **CWE** — Each exploit in this lab maps to a specific weakness: [[https://cwe.mitre.org/data/definitions/89.html|CWE-89]] (SQL Injection), [[https://cwe.mitre.org/data/definitions/22.html|CWE-22]] (Path Traversal), [[https://cwe.mitre.org/data/definitions/639.html|CWE-639]] (Insecure Direct Object Reference), [[https://cwe.mitre.org/data/definitions/548.html|CWE-548]] (Exposure of Information Through Directory Listing), [[https://cwe.mitre.org/data/definitions/200.html|CWE-200]] (Exposure of Sensitive Information)
+  * **CWE** — Each exploit in this lab maps to a specific weakness: [[https://cwe.mitre.org/data/definitions/91.html|CWE-89]] (SQL Injection), [[https://cwe.mitre.org/data/definitions/22.html|CWE-22]] (Path Traversal), [[https://cwe.mitre.org/data/definitions/639.html|CWE-639]] (Insecure Direct Object Reference), [[https://cwe.mitre.org/data/definitions/548.html|CWE-548]] (Exposure of Information Through Directory Listing), [[https://cwe.mitre.org/data/definitions/200.html|CWE-200]] (Exposure of Sensitive Information)
   * **MITRE ATT&CK** — T1190 (Exploit Public-Facing Application), T1083 (File and Directory Discovery), T1078 (Valid Accounts via credential theft)
 
 Throughout this lab, pay attention to **why** each vulnerability exists and **which framework control** would have prevented it.
@@ -52,16 +52,7 @@ In this lab, all attacks are performed using ''curl'' and command-line tools. No
 
 ==== 01. [10p] Setup and connectivity ====
 
-First, make sure that your virtual machine is updated (run the provided update.sh script).
-<code>
-root@cdci:/# cat update.sh
-#!/bin/bash
-# (c) Mihai Chiroiu - CDCI
-
-cd /home/student/CDCI-labs && git pull
-</code>
-
-Next, in one terminal start the provided Mininet topology.
+In one terminal start the provided Mininet topology.
 <code>
 root@cdci:/# cd /home/student/CDCI-labs/labs/lab03
 root@cdci:/# /usr/bin/python3 topology.py
@@ -84,6 +75,10 @@ You should see HTML content. The Juice Shop REST API is at ''http://10.0.0.3:300
 
 <note tip>
 Throughout this lab, pipe JSON responses through ''jq'' for readability: ''curl -s ... | jq .''
+
+<code>
+curl -s http://11.0.0.3:3000/rest/admin/application-version | jq
+</code>
 </note>
 
 <solution>
@@ -101,7 +96,7 @@ root@attacker:/# curl -s http://10.0.0.3:3000/rest/admin/application-version | j
 ==== 02. [15p] Reconnaissance: scanning for misconfigurations ====
 
 <note>
-**OWASP A05** — [[https://owasp.org/Top10/A05_2021-Security_Misconfiguration/|Security Misconfiguration]]. Unnecessary features enabled, default configurations, verbose error messages, and exposed sensitive endpoints are all signs of misconfiguration. This maps to **[[https://cwe.mitre.org/data/definitions/200.html|CWE-200]]** (Exposure of Sensitive Information to an Unauthorized Actor) and **[[https://cwe.mitre.org/data/definitions/548.html|CWE-548]]** (Exposure of Information Through Directory Listing).
+**OWASP A02:2025** — [[https://top10.owasp.org/2025/A02_2025-Security_Misconfiguration/|Security Misconfiguration]]. Unnecessary features enabled, default configurations, verbose error messages, and exposed sensitive endpoints are all signs of misconfiguration. This maps to **[[https://cwe.mitre.org/data/definitions/200.html|CWE-200]]** (Exposure of Sensitive Information to an Unauthorized Actor) and **[[https://cwe.mitre.org/data/definitions/548.html|CWE-548]]** (Exposure of Information Through Directory Listing).
 </note>
 
 In a real engagement, the first step is always reconnaissance. Use ''nmap'' and ''nikto'' to scan the Juice Shop application and discover hidden endpoints.
@@ -172,7 +167,7 @@ root@attacker:/# curl -s http://10.0.0.3:3000/api/SecurityQuestions | jq .
 ==== 03. [15p] Sensitive data exposure: path traversal ====
 
 <note>
-**OWASP A01** — [[https://owasp.org/Top10/A01_2021-Broken_Access_Control/|Broken Access Control]]. The ''/ftp'' endpoint serves files, but only those with specific extensions (.md, .pdf). However, the input validation can be bypassed. This exploits **[[https://cwe.mitre.org/data/definitions/22.html|CWE-22]]** (Improper Limitation of a Pathname to a Restricted Directory, aka //Path Traversal//) and relates to the well-known **[[https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-7921|CVE-2017-7921]]** pattern (unauthenticated path traversal leading to sensitive file access).
+**OWASP A01:2025** — [[https://top10.owasp.org/2025/A01_2025-Broken_Access_Control/|Broken Access Control]]. The ''/ftp'' endpoint serves files, but only those with specific extensions (.md, .pdf). However, the input validation can be bypassed. This exploits **[[https://cwe.mitre.org/data/definitions/22.html|CWE-22]]** (Improper Limitation of a Pathname to a Restricted Directory, aka //Path Traversal//) and relates to the well-known **[[https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-7921|CVE-2017-7921]]** pattern (unauthenticated path traversal leading to sensitive file access).
 </note>
 
 You discovered the ''/ftp'' directory in the previous exercise. Now exploit it.
@@ -209,7 +204,7 @@ root@attacker:/# curl -s -o incident-support.kdbx "http://10.0.0.3:3000/ftp/inci
 <note important>
 **Questions to answer:**
   - The null byte trick exploits a mismatch between the web framework's string handling and the filesystem's string handling. Which **CWE** specifically covers null byte injection? (Hint: [[https://cwe.mitre.org/data/definitions/158.html|CWE-158]])
-  - The ''package.json.bak'' file may contain dependency versions with known vulnerabilities. Which **OWASP Top 10** category covers using components with known vulnerabilities? (Hint: //A06//)
+  - The ''package.json.bak'' file may contain dependency versions with known vulnerabilities. Which **OWASP Top 10** category covers using components with known vulnerabilities? (Hint: //A03 Software Supply Chain Failures//)
   - You downloaded a ''.kdbx'' (KeePass database) file. If this contained real credentials, which **NIST CSF** function failed? (Hint: //Protect// — PR.DS — Data Security)
   - Propose one server-side mitigation to prevent the null byte bypass. (Hint: strip or reject null bytes in input)
 </note>
@@ -231,7 +226,7 @@ root@attacker:/# curl -s "http://10.0.0.3:3000/ftp/eastere.gg%2500.md"
 
 # Answers:
 # 1. CWE-158 (Improper Neutralization of Null Byte or NUL Character)
-# 2. OWASP A06 — Vulnerable and Outdated Components
+# 2. OWASP A03:2025 — Software Supply Chain Failures
 # 3. NIST CSF Protect (PR) — PR.DS-1 (Data-at-rest is protected) — sensitive files
 #    should not be accessible via public-facing endpoints
 # 4. Mitigation: sanitize input by stripping %00/%2500 null bytes before processing;
@@ -242,7 +237,7 @@ root@attacker:/# curl -s "http://10.0.0.3:3000/ftp/eastere.gg%2500.md"
 ==== 04. [20p] SQL injection: REST API login bypass ====
 
 <note>
-**OWASP A03** — [[https://owasp.org/Top10/A03_2021-Injection/|Injection]]. SQL injection remains one of the most critical web vulnerabilities. It occurs when user input is concatenated into SQL queries without proper sanitization. This is **[[https://cwe.mitre.org/data/definitions/89.html|CWE-89]]** (Improper Neutralization of Special Elements used in an SQL Command). Famous real-world examples include the 2017 Equifax breach ([[https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-5638|CVE-2017-5638]]) and the 2008 Heartland Payment Systems breach.
+**OWASP A05:2025** — [[https://top10.owasp.org/2025/A05_2025-Injection/|Injection]]. SQL injection remains one of the most critical web vulnerabilities. It occurs when user input is concatenated into SQL queries without proper sanitization. This is **[[https://cwe.mitre.org/data/definitions/89.html|CWE-89]]** (Improper Neutralization of Special Elements used in an SQL Command). Famous real-world examples include the 2017 Equifax breach ([[https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-5638|CVE-2017-5638]]) and the 2008 Heartland Payment Systems breach.
 </note>
 
 The Juice Shop login endpoint is a REST API at ''/rest/user/login'' that accepts JSON. You will exploit SQL injection to bypass authentication entirely.
@@ -358,7 +353,7 @@ root@attacker:/# echo $TOKEN | cut -d. -f2 | base64 -d 2>/dev/null | jq .
 ==== 05. [15p] Broken access control: IDOR and user enumeration ====
 
 <note>
-**OWASP A01** — [[https://owasp.org/Top10/A01_2021-Broken_Access_Control/|Broken Access Control]]. Insecure Direct Object References (IDOR) occur when an application uses user-supplied input to directly access objects (database rows, files) without verifying that the user is authorized to access that specific object. This is **[[https://cwe.mitre.org/data/definitions/639.html|CWE-639]]** (Authorization Bypass Through User-Controlled Key).
+**OWASP A01:2025** — [[https://top10.owasp.org/2025/A01_2025-Broken_Access_Control/|Broken Access Control]]. Insecure Direct Object References (IDOR) occur when an application uses user-supplied input to directly access objects (database rows, files) without verifying that the user is authorized to access that specific object. This is **[[https://cwe.mitre.org/data/definitions/639.html|CWE-639]]** (Authorization Bypass Through User-Controlled Key).
 </note>
 
 You have an admin JWT token from the previous exercise. Now explore what an authenticated attacker can access.
@@ -436,7 +431,7 @@ root@attacker:/# curl -s http://10.0.0.3:3000/api/Users \
 ==== 06. [20p] Automated SQL injection with sqlmap ====
 
 <note>
-**OWASP A03** — [[https://owasp.org/Top10/A03_2021-Injection/|Injection]]. In exercise 04, you performed SQL injection manually. Now you will use **sqlmap**, an automated SQL injection tool, to demonstrate how attackers can extract entire databases in minutes. This reinforces why **[[https://cwe.mitre.org/data/definitions/89.html|CWE-89]]** is considered critical — a single injection point can compromise the entire database.
+**OWASP A05:2025** — [[https://top10.owasp.org/2025/A05_2025-Injection/|Injection]]. In exercise 04, you performed SQL injection manually. Now you will use **sqlmap**, an automated SQL injection tool, to demonstrate how attackers can extract entire databases in minutes. This reinforces why **[[https://cwe.mitre.org/data/definitions/89.html|CWE-89]]** is considered critical — a single injection point can compromise the entire database.
 </note>
 
 **Step 1 — Identify an injectable endpoint:**
@@ -486,8 +481,7 @@ Look at the dumped Users table. You should see usernames, emails, password hashe
   - You manually exploited the login endpoint (exercise 04) and sqlmap automated the search endpoint (this exercise). Both exploit **[[https://cwe.mitre.org/data/definitions/89.html|CWE-89]]**. How many injectable endpoints might exist in a large application? Why is automated scanning essential?
   - sqlmap found the password hashes. If these were stored as unsalted MD5 (like **[[https://cwe.mitre.org/data/definitions/328.html|CWE-328]]** — Use of Weak Hash), how quickly could they be cracked? (Hint: recall lab02 exercise 11)
   - From a **NIST CSF** perspective: the //Detect// function (DE.CM — Continuous Monitoring) should catch automated SQL injection attempts. What would a WAF (Web Application Firewall) or IDS alert look like for sqlmap traffic? (Hint: think about request patterns, User-Agent headers)
-  - Propose a defense-in-depth strategy against SQL injection. Name at least 3 layers: (a) code-level, (b) infrastructure-level, (c) monitoring-level.
-</note>
+  - Propose a defense-in-depth strategy against SQL injection. Name at least 3 layers: (a) code-level, (b) infrastructure-level, (c) monitoring-level.</note>
 
 <solution>
 <code>
@@ -539,7 +533,7 @@ This is the most important exercise from a CDCI perspective. Cyber defense is no
 
 For each exploit you performed in exercises 02-06, fill in the following table. Use the references provided throughout the lab.
 
-^ Exercise ^ Attack performed ^ OWASP Top 10 ^ CWE-ID ^ NIST CSF Function & Subcategory ^ Proposed Mitigation ^
+^ Exercise ^ Attack performed ^ OWASP Top 10 (2025) ^ CWE-ID ^ NIST CSF Function & Subcategory ^ Proposed Mitigation ^
 | 02 | Directory listing + exposed metrics | ? | ? | ? | ? |
 | 03 | Path traversal via null byte  | ? | ? | ? | ? |
 | 04 | SQL injection login bypass | ? | ? | ? | ? |
@@ -548,7 +542,7 @@ For each exploit you performed in exercises 02-06, fill in the following table. 
 
 <note important>
 **Guidelines for filling the table:**
-  * **OWASP Top 10**: Use the 2021 edition codes (A01-A10). Full list: [[https://owasp.org/Top10/|owasp.org/Top10]]
+  * **OWASP Top 10**: Use the 2025 edition codes (A01-A10). Full list: [[https://top10.owasp.org/|top10.owasp.org]]
   * **CWE-ID**: Link to the specific CWE entry. Use [[https://cwe.mitre.org|cwe.mitre.org]] to look up IDs.
   * **NIST CSF**: State which function (Identify/Protect/Detect/Respond/Recover) and subcategory (e.g., PR.DS-1) **should have prevented** the attack.
   * **Mitigation**: One concrete, actionable fix (e.g., "use parameterized queries", not "fix the code").
@@ -556,9 +550,9 @@ For each exploit you performed in exercises 02-06, fill in the following table. 
 
 <solution>
 ^ Exercise ^ Attack performed ^ OWASP Top 10 ^ CWE-ID ^ NIST CSF Function & Subcategory ^ Proposed Mitigation ^
-| 02 | Directory listing, exposed /metrics | A05 Security Misconfiguration | CWE-548, CWE-200 | PR.AC-4 (Access Control) | Disable directory listing; restrict /metrics to internal network/auth |
-| 03 | Null byte path traversal | A01 Broken Access Control | CWE-22, CWE-158 | PR.DS-1 (Data-at-rest protection) | Sanitize null bytes in input; use allowlist for accessible files |
-| 04 | SQL injection login bypass | A03 Injection | CWE-89 | PR.DS (Input validation) | Use parameterized queries / prepared statements |
-| 05 | IDOR on baskets + user enum | A01 Broken Access Control | CWE-639, CWE-284 | PR.AA (Access Control) | Verify object ownership server-side before returning data |
-| 06 | Automated SQLi (sqlmap) | A03 Injection | CWE-89 | DE.CM (Continuous Monitoring) | WAF + parameterized queries + rate limiting + IDS alerts |
+| 02 | Directory listing, exposed /metrics | A02:2025 Security Misconfiguration | CWE-548, CWE-200 | PR.AC-4 (Access Control) | Disable directory listing; restrict /metrics to internal network/auth |
+| 03 | Null byte path traversal | A01:2025 Broken Access Control | CWE-22, CWE-158 | PR.DS-1 (Data-at-rest protection) | Sanitize null bytes in input; use allowlist for accessible files |
+| 04 | SQL injection login bypass | A05:2025 Injection | CWE-89 | PR.DS (Input validation) | Use parameterized queries / prepared statements |
+| 05 | IDOR on baskets + user enum | A01:2025 Broken Access Control | CWE-639, CWE-284 | PR.AA (Access Control) | Verify object ownership server-side before returning data |
+| 06 | Automated SQLi (sqlmap) | A05:2025 Injection | CWE-89 | DE.CM (Continuous Monitoring) | WAF + parameterized queries + rate limiting + IDS alerts |
 </solution>
